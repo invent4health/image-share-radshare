@@ -1,0 +1,432 @@
+﻿Load ZIP — full dcmdump tag dump
+================================
+
+ZIP: C:\Users\Anshu\Downloads\1.3.6.1.4.1.19179.1.1412422227227127.1.9354.1226.zip
+Extracted: C:\Users\Anshu\AppData\Local\Temp\dicom_dump_20260529101521
+DICOM files: 3
+
+NOTE: Full dcmdump output for every file in the ZIP.
+
+
+------------------------------------------------------------
+File 1 of 3: C:\Users\Anshu\AppData\Local\Temp\dicom_dump_20260529101521\DICOM\1968A359\2FB3433B\3679EF17
+Size: 180262 bytes
+------------------------------------------------------------
+
+
+# Dicom-File-Format
+
+# Dicom-Meta-Information-Header
+# Used TransferSyntax: Little Endian Explicit
+(0002,0000) UL 194                                      #   4, 1 FileMetaInformationGroupLength
+(0002,0001) OB 00\01                                    #   2, 1 FileMetaInformationVersion
+(0002,0002) UI =EncapsulatedPDFStorage                  #  30, 1 MediaStorageSOPClassUID
+(0002,0003) UI [1.2.840.11111.30.152.99999.235.20.100.11052026151505.878388] #  60, 1 MediaStorageSOPInstanceUID
+(0002,0010) UI =LittleEndianExplicit                    #  20, 1 TransferSyntaxUID
+(0002,0012) UI [1.2.40.0.13.1.3]                        #  16, 1 ImplementationClassUID
+(0002,0013) SH [dcm4che-5.22.0]                         #  14, 1 ImplementationVersionName
+
+# Dicom-Data-Set
+# Used TransferSyntax: Little Endian Explicit
+(0008,0005) CS [ISO 2022 IR 6]                          #  14, 1 SpecificCharacterSet
+(0008,0016) UI =EncapsulatedPDFStorage                  #  30, 1 SOPClassUID
+(0008,0018) UI [1.2.840.11111.30.152.99999.235.20.100.11052026151505.878388] #  60, 1 SOPInstanceUID
+(0008,0020) DA [20260511]                               #   8, 1 StudyDate
+(0008,0023) DA (no value available)                     #   0, 0 ContentDate
+(0008,002a) DT (no value available)                     #   0, 0 AcquisitionDateTime
+(0008,0030) TM [143627]                                 #   6, 1 StudyTime
+(0008,0033) TM (no value available)                     #   0, 0 ContentTime
+(0008,0050) SH [TWX01045]                               #   8, 1 AccessionNumber
+(0008,0060) CS [DOC]                                    #   4, 1 Modality
+(0008,0064) CS [SD]                                     #   2, 1 ConversionType
+(0008,0070) LO (no value available)                     #   0, 0 Manufacturer
+(0008,0090) PN (no value available)                     #   0, 0 ReferringPhysicianName
+(0008,1030) LO [Chest PA & Lat(Lt)]                     #  18, 1 StudyDescription
+(0008,1032) SQ (Sequence with explicit length #=0)      #   0, 1 ProcedureCodeSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0008,1048) PN (no value available)                     #   0, 0 PhysiciansOfRecord
+(0008,1080) LO (no value available)                     #   0, 0 AdmittingDiagnosesDescription
+(0010,0010) PN [NGIDI^THOBEKA^^^]                       #  16, 1 PatientName
+(0010,0020) LO [8912050186087]                          #  14, 1 PatientID
+(0010,0030) DA [19891205]                               #   8, 1 PatientBirthDate
+(0010,0032) TM (no value available)                     #   0, 0 PatientBirthTime
+(0010,0040) CS [F]                                      #   2, 1 PatientSex
+(0010,1001) PN (no value available)                     #   0, 0 OtherPatientNames
+(0010,1010) AS [036Y]                                   #   4, 1 PatientAge
+(0010,1020) DS [0]                                      #   2, 1 PatientSize
+(0010,1030) DS [0]                                      #   2, 1 PatientWeight
+(0010,2160) SH (no value available)                     #   0, 0 RETIRED_EthnicGroup
+(0010,2180) SH (no value available)                     #   0, 0 Occupation
+(0010,21b0) LT (no value available)                     #   0, 0 AdditionalPatientHistory
+(0010,4000) LT (no value available)                     #   0, 0 PatientComments
+(0020,000d) UI [1.3.6.1.4.1.19179.1.1412422227227127.1.9354.1226] #  48, 1 StudyInstanceUID
+(0020,000e) UI [1.2.840.11111.30.152.99999.235.20.100.11052026151505.485285] #  60, 1 SeriesInstanceUID
+(0020,0010) SH [228]                                    #   4, 1 StudyID
+(0020,0011) IS [1]                                      #   2, 1 SeriesNumber
+(0020,0013) IS [1]                                      #   2, 1 InstanceNumber
+(0028,0301) CS [YES]                                    #   4, 1 BurnedInAnnotation
+(0040,a043) SQ (Sequence with explicit length #=0)      #   0, 1 ConceptNameCodeSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0042,0010) ST (no value available)                     #   0, 0 DocumentTitle
+(0042,0011) OB 25\50\44\46\2d\31\2e\37\0a\25\e2\e3\cf\d3\0a\31\32\20\30\20\6f\62... # 179258, 1 EncapsulatedDocument
+(0042,0012) LO [application/pdf]                        #  16, 1 MIMETypeOfEncapsulatedDocument
+
+
+------------------------------------------------------------
+File 2 of 3: C:\Users\Anshu\AppData\Local\Temp\dicom_dump_20260529101521\DICOM\1968A359\E766317D\7C4AE43F
+Size: 18876518 bytes
+------------------------------------------------------------
+
+
+# Dicom-File-Format
+
+# Dicom-Meta-Information-Header
+# Used TransferSyntax: Little Endian Explicit
+(0002,0000) UL 180                                      #   4, 1 FileMetaInformationGroupLength
+(0002,0001) OB 00\01                                    #   2, 1 FileMetaInformationVersion
+(0002,0002) UI =DigitalXRayImageStorageForPresentation  #  28, 1 MediaStorageSOPClassUID
+(0002,0003) UI [1.3.6.1.4.1.19179.1.1412422227227127.3.9781.1228] #  48, 1 MediaStorageSOPInstanceUID
+(0002,0010) UI =LittleEndianExplicit                    #  20, 1 TransferSyntaxUID
+(0002,0012) UI [1.2.40.0.13.1.3]                        #  16, 1 ImplementationClassUID
+(0002,0013) SH [dcm4che-5.22.0]                         #  14, 1 ImplementationVersionName
+
+# Dicom-Data-Set
+# Used TransferSyntax: Little Endian Explicit
+(0008,0005) CS [ISO 2022 IR 6]                          #  14, 1 SpecificCharacterSet
+(0008,0008) CS [DERIVED\PRIMARY]                        #  16, 2 ImageType
+(0008,0016) UI =DigitalXRayImageStorageForPresentation  #  28, 1 SOPClassUID
+(0008,0018) UI [1.3.6.1.4.1.19179.1.1412422227227127.3.9781.1228] #  48, 1 SOPInstanceUID
+(0008,0020) DA [20260511]                               #   8, 1 StudyDate
+(0008,0021) DA [20260511]                               #   8, 1 SeriesDate
+(0008,0022) DA [20260511]                               #   8, 1 AcquisitionDate
+(0008,0023) DA [20260511]                               #   8, 1 ContentDate
+(0008,0030) TM [143627]                                 #   6, 1 StudyTime
+(0008,0031) TM [143838]                                 #   6, 1 SeriesTime
+(0008,0032) TM [143838]                                 #   6, 1 AcquisitionTime
+(0008,0033) TM [143838]                                 #   6, 1 ContentTime
+(0008,0050) SH [TWX01045]                               #   8, 1 AccessionNumber
+(0008,0060) CS [DX]                                     #   2, 1 Modality
+(0008,0068) CS [FOR PRESENTATION]                       #  16, 1 PresentationIntentType
+(0008,0070) LO (no value available)                     #   0, 0 Manufacturer
+(0008,0080) LO [THE WHEEL X-RAY]                        #  16, 1 InstitutionName
+(0008,0081) ST (no value available)                     #   0, 0 InstitutionAddress
+(0008,0090) PN (no value available)                     #   0, 0 ReferringPhysicianName
+(0008,1010) SH (no value available)                     #   0, 0 StationName
+(0008,1030) LO [Chest PA & Lat(Lt)]                     #  18, 1 StudyDescription
+(0008,1032) SQ (Sequence with explicit length #=0)      #   0, 1 ProcedureCodeSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0008,103e) LO (no value available)                     #   0, 0 SeriesDescription
+(0008,1040) LO (no value available)                     #   0, 0 InstitutionalDepartmentName
+(0008,1048) PN (no value available)                     #   0, 0 PhysiciansOfRecord
+(0008,1050) PN [admin^^^^]                              #  10, 1 PerformingPhysicianName
+(0008,1060) PN (no value available)                     #   0, 0 NameOfPhysiciansReadingStudy
+(0008,1070) PN (no value available)                     #   0, 0 OperatorsName
+(0008,1080) LO (no value available)                     #   0, 0 AdmittingDiagnosesDescription
+(0008,1090) LO (no value available)                     #   0, 0 ManufacturerModelName
+(0008,1110) SQ (Sequence with explicit length #=0)      #   0, 1 ReferencedStudySequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0008,1111) SQ (Sequence with explicit length #=0)      #   0, 1 ReferencedPerformedProcedureStepSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0008,2218) SQ (Sequence with undefined length #=1)     # u/l, 1 AnatomicRegionSequence
+  (fffe,e000) na (Item with undefined length #=4)         # u/l, 1 Item
+    (0008,0100) SH [T-D3000]                                #   8, 1 CodeValue
+    (0008,0102) SH [SRT]                                    #   4, 1 CodingSchemeDesignator
+    (0008,0103) SH (no value available)                     #   0, 0 CodingSchemeVersion
+    (0008,0104) LO [Chest]                                  #   6, 1 CodeMeaning
+  (fffe,e00d) na (ItemDelimitationItem)                   #   0, 0 ItemDelimitationItem
+(fffe,e0dd) na (SequenceDelimitationItem)               #   0, 0 SequenceDelimitationItem
+(0010,0010) PN [NGIDI^THOBEKA^^^]                       #  16, 1 PatientName
+(0010,0020) LO [8912050186087]                          #  14, 1 PatientID
+(0010,0030) DA [19891205]                               #   8, 1 PatientBirthDate
+(0010,0032) TM (no value available)                     #   0, 0 PatientBirthTime
+(0010,0040) CS [F]                                      #   2, 1 PatientSex
+(0010,1000) LO (no value available)                     #   0, 0 RETIRED_OtherPatientIDs
+(0010,1001) PN (no value available)                     #   0, 0 OtherPatientNames
+(0010,1010) AS [036Y]                                   #   4, 1 PatientAge
+(0010,1020) DS [0]                                      #   2, 1 PatientSize
+(0010,1030) DS [0]                                      #   2, 1 PatientWeight
+(0010,2160) SH (no value available)                     #   0, 0 RETIRED_EthnicGroup
+(0010,2180) SH (no value available)                     #   0, 0 Occupation
+(0010,21b0) LT (no value available)                     #   0, 0 AdditionalPatientHistory
+(0010,4000) LT (no value available)                     #   0, 0 PatientComments
+(0018,0015) CS [CHEST]                                  #   6, 1 BodyPartExamined
+(0018,0060) DS [0]                                      #   2, 1 KVP
+(0018,1000) LO (no value available)                     #   0, 0 DeviceSerialNumber
+(0018,1020) LO [1.0.11]                                 #   6, 1 SoftwareVersions
+(0018,1030) LO [CHEST]                                  #   6, 1 ProtocolName
+(0018,1110) DS [0]                                      #   2, 1 DistanceSourceToDetector
+(0018,1111) DS [0]                                      #   2, 1 DistanceSourceToPatient
+(0018,1150) IS [0]                                      #   2, 1 ExposureTime
+(0018,1151) IS [0]                                      #   2, 1 XRayTubeCurrent
+(0018,1152) IS [0]                                      #   2, 1 Exposure
+(0018,1153) IS [0]                                      #   2, 1 ExposureInuAs
+(0018,115e) DS [0.00]                                   #   4, 1 ImageAndFluoroscopyAreaDoseProduct
+(0018,1164) DS [0.14\0.14]                              #  10, 2 ImagerPixelSpacing
+(0018,1200) DA [19700101]                               #   8, 1 DateOfLastCalibration
+(0018,1201) TM [020000]                                 #   6, 1 TimeOfLastCalibration
+(0018,1411) DS [368]                                    #   4, 1 ExposureIndex
+(0018,1412) DS [286]                                    #   4, 1 TargetExposureIndex
+(0018,1413) DS [1.10559094930427]                       #  16, 1 DeviationIndex
+(0018,1508) CS (no value available)                     #   0, 0 PositionerType
+(0018,5101) CS [PA]                                     #   2, 1 ViewPosition
+(0018,7001) DS [0]                                      #   2, 1 DetectorTemperature
+(0018,7004) CS [SCINTILLATOR]                           #  12, 1 DetectorType
+(0018,7005) CS [AREA]                                   #   4, 1 DetectorConfiguration
+(0018,7008) LT [Normal]                                 #   6, 1 DetectorMode
+(0018,700a) SH [0]                                      #   2, 1 DetectorID
+(0018,700c) DA [19700101]                               #   8, 1 DateOfLastDetectorCalibration
+(0018,700e) TM [020000]                                 #   6, 1 TimeOfLastDetectorCalibration
+(0018,701a) DS [1\1]                                    #   4, 2 DetectorBinning
+(0018,702a) LO [Vieworks Co.,Ltd]                       #  16, 1 DetectorManufacturerName
+(0018,702b) LO [FXRD-4343VAW]                           #  12, 1 DetectorManufacturerModelName
+(0018,8150) DS [0]                                      #   2, 1 ExposureTimeInuS
+(0018,8151) DS [0]                                      #   2, 1 XRayTubeCurrentInuA
+(0020,000d) UI [1.3.6.1.4.1.19179.1.1412422227227127.1.9354.1226] #  48, 1 StudyInstanceUID
+(0020,000e) UI [1.3.6.1.4.1.19179.1.1412422227227127.2.9781.1227] #  48, 1 SeriesInstanceUID
+(0020,0010) SH [228]                                    #   4, 1 StudyID
+(0020,0011) IS [1]                                      #   2, 1 SeriesNumber
+(0020,0013) IS [1]                                      #   2, 1 InstanceNumber
+(0020,0020) CS (no value available)                     #   0, 0 PatientOrientation
+(0020,0060) CS (no value available)                     #   0, 0 Laterality
+(0020,0062) CS (no value available)                     #   0, 0 ImageLaterality
+(0020,4000) LT (no value available)                     #   0, 0 ImageComments
+(0028,0002) US 1                                        #   2, 1 SamplesPerPixel
+(0028,0004) CS [MONOCHROME2]                            #  12, 1 PhotometricInterpretation
+(0028,0008) IS [1]                                      #   2, 1 NumberOfFrames
+(0028,0010) US 3072                                     #   2, 1 Rows
+(0028,0011) US 3072                                     #   2, 1 Columns
+(0028,0030) DS [0.14\0.14]                              #  10, 2 PixelSpacing
+(0028,0100) US 16                                       #   2, 1 BitsAllocated
+(0028,0101) US 16                                       #   2, 1 BitsStored
+(0028,0102) US 15                                       #   2, 1 HighBit
+(0028,0103) US 0                                        #   2, 1 PixelRepresentation
+(0028,0106) SS 0                                        #   2, 1 SmallestImagePixelValue
+(0028,0107) SS -1                                       #   2, 1 LargestImagePixelValue
+(0028,0108) SS 0                                        #   2, 1 SmallestPixelValueInSeries
+(0028,0109) SS -1                                       #   2, 1 LargestPixelValueInSeries
+(0028,0301) CS [YES]                                    #   4, 1 BurnedInAnnotation
+(0028,1040) CS [LIN]                                    #   4, 1 PixelIntensityRelationship
+(0028,1041) SS -1                                       #   2, 1 PixelIntensityRelationshipSign
+(0028,1050) DS [30781]                                  #   6, 1 WindowCenter
+(0028,1051) DS [22975]                                  #   6, 1 WindowWidth
+(0028,1052) DS [0]                                      #   2, 1 RescaleIntercept
+(0028,1053) DS [1]                                      #   2, 1 RescaleSlope
+(0028,1054) LO [US]                                     #   2, 1 RescaleType
+(0028,2110) CS [00]                                     #   2, 1 LossyImageCompression
+(0038,0400) LO (no value available)                     #   0, 0 PatientInstitutionResidence
+(0040,0244) DA [20260511]                               #   8, 1 PerformedProcedureStepStartDate
+(0040,0245) TM [143838]                                 #   6, 1 PerformedProcedureStepStartTime
+(0040,0253) SH (no value available)                     #   0, 0 PerformedProcedureStepID
+(0040,0254) LO (no value available)                     #   0, 0 PerformedProcedureStepDescription
+(0040,0260) SQ (Sequence with explicit length #=0)      #   0, 1 PerformedProtocolCodeSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0040,0275) SQ (Sequence with explicit length #=0)      #   0, 1 RequestAttributesSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0040,0555) SQ (Sequence with explicit length #=0)      #   0, 1 AcquisitionContextSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0040,1001) SH (no value available)                     #   0, 0 RequestedProcedureID
+(0040,1003) SH (no value available)                     #   0, 0 RequestedProcedurePriority
+(0054,0220) SQ (Sequence with undefined length #=1)     # u/l, 1 ViewCodeSequence
+  (fffe,e000) na (Item with undefined length #=4)         # u/l, 1 Item
+    (0008,0100) SH [R-10214]                                #   8, 1 CodeValue
+    (0008,0102) SH [SRT]                                    #   4, 1 CodingSchemeDesignator
+    (0008,0103) SH (no value available)                     #   0, 0 CodingSchemeVersion
+    (0008,0104) LO [postero-anterior]                       #  16, 1 CodeMeaning
+  (fffe,e00d) na (ItemDelimitationItem)                   #   0, 0 ItemDelimitationItem
+(fffe,e0dd) na (SequenceDelimitationItem)               #   0, 0 SequenceDelimitationItem
+(0054,0410) SQ (Sequence with explicit length #=0)      #   0, 1 PatientOrientationCodeSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(7fe0,0010) OW 0000\0000\0000\0000\0000\0000\0000\0000\0000\0000\0000\0000\0000... # 18874368, 1 PixelData
+
+
+------------------------------------------------------------
+File 3 of 3: C:\Users\Anshu\AppData\Local\Temp\dicom_dump_20260529101521\DICOM\1968A359\E766317D\F154EF21
+Size: 18876520 bytes
+------------------------------------------------------------
+
+
+# Dicom-File-Format
+
+# Dicom-Meta-Information-Header
+# Used TransferSyntax: Little Endian Explicit
+(0002,0000) UL 182                                      #   4, 1 FileMetaInformationGroupLength
+(0002,0001) OB 00\01                                    #   2, 1 FileMetaInformationVersion
+(0002,0002) UI =DigitalXRayImageStorageForPresentation  #  28, 1 MediaStorageSOPClassUID
+(0002,0003) UI [1.3.6.1.4.1.19179.1.1412422227227127.3.10003.1229] #  50, 1 MediaStorageSOPInstanceUID
+(0002,0010) UI =LittleEndianExplicit                    #  20, 1 TransferSyntaxUID
+(0002,0012) UI [1.2.40.0.13.1.3]                        #  16, 1 ImplementationClassUID
+(0002,0013) SH [dcm4che-5.22.0]                         #  14, 1 ImplementationVersionName
+
+# Dicom-Data-Set
+# Used TransferSyntax: Little Endian Explicit
+(0008,0005) CS [ISO 2022 IR 6]                          #  14, 1 SpecificCharacterSet
+(0008,0008) CS [DERIVED\PRIMARY]                        #  16, 2 ImageType
+(0008,0016) UI =DigitalXRayImageStorageForPresentation  #  28, 1 SOPClassUID
+(0008,0018) UI [1.3.6.1.4.1.19179.1.1412422227227127.3.10003.1229] #  50, 1 SOPInstanceUID
+(0008,0020) DA [20260511]                               #   8, 1 StudyDate
+(0008,0021) DA [20260511]                               #   8, 1 SeriesDate
+(0008,0022) DA [20260511]                               #   8, 1 AcquisitionDate
+(0008,0023) DA [20260511]                               #   8, 1 ContentDate
+(0008,0030) TM [143627]                                 #   6, 1 StudyTime
+(0008,0031) TM [143838]                                 #   6, 1 SeriesTime
+(0008,0032) TM [143946]                                 #   6, 1 AcquisitionTime
+(0008,0033) TM [143946]                                 #   6, 1 ContentTime
+(0008,0050) SH [TWX01045]                               #   8, 1 AccessionNumber
+(0008,0060) CS [DX]                                     #   2, 1 Modality
+(0008,0068) CS [FOR PRESENTATION]                       #  16, 1 PresentationIntentType
+(0008,0070) LO (no value available)                     #   0, 0 Manufacturer
+(0008,0080) LO [THE WHEEL X-RAY]                        #  16, 1 InstitutionName
+(0008,0081) ST (no value available)                     #   0, 0 InstitutionAddress
+(0008,0090) PN (no value available)                     #   0, 0 ReferringPhysicianName
+(0008,1010) SH (no value available)                     #   0, 0 StationName
+(0008,1030) LO [Chest PA & Lat(Lt)]                     #  18, 1 StudyDescription
+(0008,1032) SQ (Sequence with explicit length #=0)      #   0, 1 ProcedureCodeSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0008,103e) LO (no value available)                     #   0, 0 SeriesDescription
+(0008,1040) LO (no value available)                     #   0, 0 InstitutionalDepartmentName
+(0008,1048) PN (no value available)                     #   0, 0 PhysiciansOfRecord
+(0008,1050) PN [admin^^^^]                              #  10, 1 PerformingPhysicianName
+(0008,1060) PN (no value available)                     #   0, 0 NameOfPhysiciansReadingStudy
+(0008,1070) PN (no value available)                     #   0, 0 OperatorsName
+(0008,1080) LO (no value available)                     #   0, 0 AdmittingDiagnosesDescription
+(0008,1090) LO (no value available)                     #   0, 0 ManufacturerModelName
+(0008,1110) SQ (Sequence with explicit length #=0)      #   0, 1 ReferencedStudySequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0008,1111) SQ (Sequence with explicit length #=0)      #   0, 1 ReferencedPerformedProcedureStepSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0008,2218) SQ (Sequence with undefined length #=1)     # u/l, 1 AnatomicRegionSequence
+  (fffe,e000) na (Item with undefined length #=4)         # u/l, 1 Item
+    (0008,0100) SH [T-D3000]                                #   8, 1 CodeValue
+    (0008,0102) SH [SRT]                                    #   4, 1 CodingSchemeDesignator
+    (0008,0103) SH (no value available)                     #   0, 0 CodingSchemeVersion
+    (0008,0104) LO [Chest]                                  #   6, 1 CodeMeaning
+  (fffe,e00d) na (ItemDelimitationItem)                   #   0, 0 ItemDelimitationItem
+(fffe,e0dd) na (SequenceDelimitationItem)               #   0, 0 SequenceDelimitationItem
+(0010,0010) PN [NGIDI^THOBEKA^^^]                       #  16, 1 PatientName
+(0010,0020) LO [8912050186087]                          #  14, 1 PatientID
+(0010,0030) DA [19891205]                               #   8, 1 PatientBirthDate
+(0010,0032) TM (no value available)                     #   0, 0 PatientBirthTime
+(0010,0040) CS [F]                                      #   2, 1 PatientSex
+(0010,1000) LO (no value available)                     #   0, 0 RETIRED_OtherPatientIDs
+(0010,1001) PN (no value available)                     #   0, 0 OtherPatientNames
+(0010,1010) AS [036Y]                                   #   4, 1 PatientAge
+(0010,1020) DS [0]                                      #   2, 1 PatientSize
+(0010,1030) DS [0]                                      #   2, 1 PatientWeight
+(0010,2160) SH (no value available)                     #   0, 0 RETIRED_EthnicGroup
+(0010,2180) SH (no value available)                     #   0, 0 Occupation
+(0010,21b0) LT (no value available)                     #   0, 0 AdditionalPatientHistory
+(0010,4000) LT (no value available)                     #   0, 0 PatientComments
+(0018,0015) CS [CHEST]                                  #   6, 1 BodyPartExamined
+(0018,0060) DS [0]                                      #   2, 1 KVP
+(0018,1000) LO (no value available)                     #   0, 0 DeviceSerialNumber
+(0018,1020) LO [1.0.11]                                 #   6, 1 SoftwareVersions
+(0018,1030) LO [CHEST]                                  #   6, 1 ProtocolName
+(0018,1110) DS [0]                                      #   2, 1 DistanceSourceToDetector
+(0018,1111) DS [0]                                      #   2, 1 DistanceSourceToPatient
+(0018,1150) IS [0]                                      #   2, 1 ExposureTime
+(0018,1151) IS [0]                                      #   2, 1 XRayTubeCurrent
+(0018,1152) IS [0]                                      #   2, 1 Exposure
+(0018,1153) IS [0]                                      #   2, 1 ExposureInuAs
+(0018,115e) DS [0.00]                                   #   4, 1 ImageAndFluoroscopyAreaDoseProduct
+(0018,1164) DS [0.14\0.14]                              #  10, 2 ImagerPixelSpacing
+(0018,1200) DA [19700101]                               #   8, 1 DateOfLastCalibration
+(0018,1201) TM [020000]                                 #   6, 1 TimeOfLastCalibration
+(0018,1411) DS [276]                                    #   4, 1 ExposureIndex
+(0018,1412) DS [286]                                    #   4, 1 TargetExposureIndex
+(0018,1413) DS [-0.1417305330302]                       #  16, 1 DeviationIndex
+(0018,1508) CS (no value available)                     #   0, 0 PositionerType
+(0018,5101) CS [LATERAL]                                #   8, 1 ViewPosition
+(0018,7001) DS [0]                                      #   2, 1 DetectorTemperature
+(0018,7004) CS [SCINTILLATOR]                           #  12, 1 DetectorType
+(0018,7005) CS [AREA]                                   #   4, 1 DetectorConfiguration
+(0018,7008) LT [Normal]                                 #   6, 1 DetectorMode
+(0018,700a) SH [0]                                      #   2, 1 DetectorID
+(0018,700c) DA [19700101]                               #   8, 1 DateOfLastDetectorCalibration
+(0018,700e) TM [020000]                                 #   6, 1 TimeOfLastDetectorCalibration
+(0018,701a) DS [1\1]                                    #   4, 2 DetectorBinning
+(0018,702a) LO [Vieworks Co.,Ltd]                       #  16, 1 DetectorManufacturerName
+(0018,702b) LO [FXRD-4343VAW]                           #  12, 1 DetectorManufacturerModelName
+(0018,8150) DS [0]                                      #   2, 1 ExposureTimeInuS
+(0018,8151) DS [0]                                      #   2, 1 XRayTubeCurrentInuA
+(0020,000d) UI [1.3.6.1.4.1.19179.1.1412422227227127.1.9354.1226] #  48, 1 StudyInstanceUID
+(0020,000e) UI [1.3.6.1.4.1.19179.1.1412422227227127.2.9781.1227] #  48, 1 SeriesInstanceUID
+(0020,0010) SH [228]                                    #   4, 1 StudyID
+(0020,0011) IS [1]                                      #   2, 1 SeriesNumber
+(0020,0013) IS [2]                                      #   2, 1 InstanceNumber
+(0020,0020) CS (no value available)                     #   0, 0 PatientOrientation
+(0020,0060) CS (no value available)                     #   0, 0 Laterality
+(0020,0062) CS (no value available)                     #   0, 0 ImageLaterality
+(0020,4000) LT (no value available)                     #   0, 0 ImageComments
+(0028,0002) US 1                                        #   2, 1 SamplesPerPixel
+(0028,0004) CS [MONOCHROME2]                            #  12, 1 PhotometricInterpretation
+(0028,0008) IS [1]                                      #   2, 1 NumberOfFrames
+(0028,0010) US 3072                                     #   2, 1 Rows
+(0028,0011) US 3072                                     #   2, 1 Columns
+(0028,0030) DS [0.14\0.14]                              #  10, 2 PixelSpacing
+(0028,0100) US 16                                       #   2, 1 BitsAllocated
+(0028,0101) US 16                                       #   2, 1 BitsStored
+(0028,0102) US 15                                       #   2, 1 HighBit
+(0028,0103) US 0                                        #   2, 1 PixelRepresentation
+(0028,0106) SS 0                                        #   2, 1 SmallestImagePixelValue
+(0028,0107) SS -1                                       #   2, 1 LargestImagePixelValue
+(0028,0108) SS 0                                        #   2, 1 SmallestPixelValueInSeries
+(0028,0109) SS -1                                       #   2, 1 LargestPixelValueInSeries
+(0028,0301) CS [YES]                                    #   4, 1 BurnedInAnnotation
+(0028,1040) CS [LIN]                                    #   4, 1 PixelIntensityRelationship
+(0028,1041) SS -1                                       #   2, 1 PixelIntensityRelationshipSign
+(0028,1050) DS [28247]                                  #   6, 1 WindowCenter
+(0028,1051) DS [21719]                                  #   6, 1 WindowWidth
+(0028,1052) DS [0]                                      #   2, 1 RescaleIntercept
+(0028,1053) DS [1]                                      #   2, 1 RescaleSlope
+(0028,1054) LO [US]                                     #   2, 1 RescaleType
+(0028,2110) CS [00]                                     #   2, 1 LossyImageCompression
+(0038,0400) LO (no value available)                     #   0, 0 PatientInstitutionResidence
+(0040,0244) DA [20260511]                               #   8, 1 PerformedProcedureStepStartDate
+(0040,0245) TM [143838]                                 #   6, 1 PerformedProcedureStepStartTime
+(0040,0253) SH (no value available)                     #   0, 0 PerformedProcedureStepID
+(0040,0254) LO (no value available)                     #   0, 0 PerformedProcedureStepDescription
+(0040,0260) SQ (Sequence with explicit length #=0)      #   0, 1 PerformedProtocolCodeSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0040,0275) SQ (Sequence with explicit length #=0)      #   0, 1 RequestAttributesSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0040,0555) SQ (Sequence with explicit length #=0)      #   0, 1 AcquisitionContextSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(0040,1001) SH (no value available)                     #   0, 0 RequestedProcedureID
+(0040,1003) SH (no value available)                     #   0, 0 RequestedProcedurePriority
+(0054,0220) SQ (Sequence with undefined length #=1)     # u/l, 1 ViewCodeSequence
+  (fffe,e000) na (Item with undefined length #=4)         # u/l, 1 Item
+    (0008,0100) SH [R-102CD]                                #   8, 1 CodeValue
+    (0008,0102) SH [SRT]                                    #   4, 1 CodingSchemeDesignator
+    (0008,0103) SH (no value available)                     #   0, 0 CodingSchemeVersion
+    (0008,0104) LO [lateral]                                #   8, 1 CodeMeaning
+  (fffe,e00d) na (ItemDelimitationItem)                   #   0, 0 ItemDelimitationItem
+(fffe,e0dd) na (SequenceDelimitationItem)               #   0, 0 SequenceDelimitationItem
+(0054,0410) SQ (Sequence with explicit length #=0)      #   0, 1 PatientOrientationCodeSequence
+(fffe,e0dd) na (SequenceDelimitationItem for re-encod.) #   0, 0 SequenceDelimitationItem
+(7fe0,0010) OW 0000\0000\0000\0000\0000\0000\0000\0000\0000\0000\0000\0000\0000... # 18874368, 1 PixelData
+
+
+============================================================
+MODALITY-RELATED TAGS (quick scan across all files)
+============================================================
+
+--- 3679EF17 (180262 bytes) ---
+(0008,0060) CS [DOC]                                    #   4, 1 Modality
+
+--- 7C4AE43F (18876518 bytes) ---
+(0008,0008) CS [DERIVED\PRIMARY]                        #  16, 2 ImageType
+(0008,0060) CS [DX]                                     #   2, 1 Modality
+(0008,103e) LO (no value available)                     #   0, 0 SeriesDescription
+(0018,0015) CS [CHEST]                                  #   6, 1 BodyPartExamined
+(0040,0244) DA [20260511]                               #   8, 1 PerformedProcedureStepStartDate
+(0040,0245) TM [143838]                                 #   6, 1 PerformedProcedureStepStartTime
+(0040,0254) LO (no value available)                     #   0, 0 PerformedProcedureStepDescription
+
+--- F154EF21 (18876520 bytes) ---
+(0008,0008) CS [DERIVED\PRIMARY]                        #  16, 2 ImageType
+(0008,0060) CS [DX]                                     #   2, 1 Modality
+(0008,103e) LO (no value available)                     #   0, 0 SeriesDescription
+(0018,0015) CS [CHEST]                                  #   6, 1 BodyPartExamined
+(0040,0244) DA [20260511]                               #   8, 1 PerformedProcedureStepStartDate
+(0040,0245) TM [143838]                                 #   6, 1 PerformedProcedureStepStartTime
+(0040,0254) LO (no value available)                     #   0, 0 PerformedProcedureStepDescription

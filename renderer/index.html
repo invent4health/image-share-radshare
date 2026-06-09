@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RADSHARE</title>
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        background: #f5f5f5;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      .container {
+        display: flex;
+        height: 100vh;
+        width: 100vw;
+      }
+
+      .container.preview-disabled .right-panel {
+        display: none;
+      }
+
+      .container.preview-disabled {
+        justify-content: center;
+        align-items: center;
+        background: #eef1f0;
+      }
+
+      .container.preview-disabled .left-panel {
+        width: 380px;
+        max-width: 380px;
+        flex: 0 0 auto;
+        height: auto;
+        max-height: calc(100vh - 32px);
+        align-self: center;
+        border: 1px solid #d8e0dd;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+      }
+
+      .left-panel {
+        width: 380px;
+        max-width: 380px;
+        flex: 0 0 380px;
+        background: #f7f9f8;
+        border-right: 1px solid #e0e0e0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .menu-shell {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 18px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+
+      .menu-step {
+        padding: 16px 0;
+        border-bottom: 1px solid #e3ebe7;
+      }
+
+      .menu-step:first-child {
+        padding-top: 6px;
+      }
+
+      .menu-step:first-child .step-title {
+        margin-top: 0;
+      }
+
+      .menu-step:last-of-type {
+        border-bottom: none;
+      }
+
+      .step-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #1a2e2b;
+        margin-bottom: 12px;
+        line-height: 1.35;
+      }
+
+      .step-actions-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .input-group label {
+        font-weight: 500;
+        color: #5a6b66;
+        font-size: 12px;
+      }
+
+      .input-group input {
+        padding: 10px 12px;
+        border: 1px solid #d0ddd8;
+        border-radius: 10px;
+        font-size: 13px;
+        background: #fff;
+        transition: border-color 0.2s;
+      }
+
+      .input-group input:focus {
+        outline: 2px solid #c4dacd;
+        border-color: #b8cfc6;
+      }
+
+      .portal-link-scan-status {
+        font-size: 12px;
+        line-height: 1.35;
+        margin: 4px 0 0;
+        color: #5a6b66;
+      }
+
+      .portal-link-scan-status:empty {
+        display: none;
+      }
+
+      .portal-link-scan-status.is-scanning {
+        color: #005450;
+        font-weight: 500;
+      }
+
+      .portal-link-scan-status.is-completed {
+        color: #0d7a71;
+        font-weight: 500;
+      }
+
+      .portal-link-scan-status.is-error {
+        color: #c62828;
+      }
+
+      .portal-link-group {
+        gap: 4px;
+      }
+
+      .load-portal-btn {
+        width: 100%;
+        margin-top: 2px;
+      }
+
+      .menu-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .button {
+        background: #005450;
+        color: white;
+        border: none;
+        padding: 11px 16px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        width: 100%;
+        text-align: center;
+      }
+
+      .button:hover {
+        background: #003f3a;
+      }
+
+      .button:disabled {
+        background: #b5c4bf;
+        cursor: not-allowed;
+      }
+
+      .button.is-downloading:disabled {
+        background: #005450 !important;
+        color: #fff !important;
+        cursor: wait;
+        opacity: 1;
+      }
+
+      .load-portal-btn.is-downloading,
+      .assign-study-btn.is-assigning {
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+      }
+
+      .load-portal-btn.is-downloading::after,
+      .assign-study-btn.is-assigning::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          105deg,
+          transparent 0%,
+          rgba(255, 255, 255, 0.12) 45%,
+          rgba(255, 255, 255, 0.35) 50%,
+          rgba(255, 255, 255, 0.12) 55%,
+          transparent 100%
+        );
+        transform: translateX(-120%);
+        animation: button-shimmer 1.1s ease-in-out infinite;
+        pointer-events: none;
+      }
+
+      @keyframes button-shimmer {
+        0% {
+          transform: translateX(-120%);
+        }
+        100% {
+          transform: translateX(120%);
+        }
+      }
+
+      .button-outline {
+        background: #fff;
+        color: #1a2e2b;
+        border: 1px solid #c8d6d1;
+      }
+
+      .button-outline:hover {
+        background: #f0f5f3;
+      }
+
+      #import-progress-wrap.is-hidden {
+        display: none;
+      }
+
+      .import-step .progress-track {
+        height: 10px;
+        background: #e8eeeb;
+        border-radius: 999px;
+        overflow: hidden;
+        margin: 10px 0 8px;
+      }
+
+      .import-step .progress-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #005450 0%, #0d7a71 100%);
+        border-radius: 999px;
+        transition: width 0.4s ease;
+      }
+
+      .import-progress-text {
+        font-size: 14px;
+        font-weight: 500;
+        color: #1a2e2b;
+        margin-bottom: 10px;
+      }
+
+      .import-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .patient-card {
+        background: #f7f9f8;
+        border: 1px solid #e3ebe7;
+        border-radius: 10px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .patient-card-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 12px;
+      }
+
+      .patient-field {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .patient-field-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: #5a6b66;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+
+      .patient-field-value {
+        font-size: 14px;
+        font-weight: 500;
+        color: #1a2e2b;
+        word-break: break-word;
+      }
+
+      .patient-field-value.meta-missing {
+        color: #9aa8a3;
+        font-style: italic;
+        font-weight: 400;
+      }
+
+      .assign-study-btn {
+        width: 100%;
+        margin-top: 10px;
+      }
+
+      .assign-study-btn.is-assigning {
+        background: #005450 !important;
+        color: #fff !important;
+        cursor: wait;
+      }
+
+      .hidden-ui {
+        display: none !important;
+      }
+
+      .status {
+        display: none;
+      }
+
+      .import-progress-text.is-error {
+        color: #c62828;
+      }
+
+      .right-panel {
+        flex: 1;
+        background: white;
+        position: relative;
+      }
+
+      .preview-placeholder {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        color: #999;
+        font-size: 32px;
+      }
+
+      .preview-placeholder.hidden {
+        display: none;
+      }
+
+      /* Modal */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        display: none;
+        opacity: 0;
+        transition: opacity 180ms ease;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+
+      .modal-overlay.open {
+        display: flex;
+        opacity: 1;
+      }
+
+      /* Stack above Admin Panel when opened from it */
+      #pacs-modal.modal-overlay,
+      #send-modal.modal-overlay,
+      #send-settings-modal.modal-overlay,
+      #assign-study-settings-modal.modal-overlay,
+      #pacs-list-modal.modal-overlay {
+        z-index: 1100;
+      }
+
+      #qr-modal.modal-overlay {
+        z-index: 1150;
+      }
+
+      #auth-modal.modal-overlay {
+        z-index: 1200;
+      }
+
+      #assign-study-modal.modal-overlay {
+        z-index: 1180;
+      }
+
+      #assign-mwl-tags-modal.modal-overlay {
+        z-index: 1190;
+      }
+
+      .assign-mwl-tags-modal {
+        width: 780px;
+        max-width: calc(100vw - 32px);
+      }
+
+      .assign-mwl-tags-modal .modal-body {
+        display: block;
+        padding: 12px 20px 16px;
+      }
+
+      .assign-mwl-tags-subtitle {
+        font-size: 13px;
+        font-weight: 500;
+        color: #5a6b66;
+        margin-bottom: 10px;
+      }
+
+      .assign-mwl-tags-search-row {
+        margin-bottom: 10px;
+      }
+
+      .assign-mwl-tags-search-row input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #d6e5df;
+        border-radius: 8px;
+        font-size: 14px;
+        box-sizing: border-box;
+      }
+
+      .assign-mwl-tags-search-row input:focus {
+        outline: 2px solid #c4dacd;
+        border-color: #c4dacd;
+      }
+
+      .assign-mwl-tags-wrap {
+        max-height: 55vh;
+        overflow: auto;
+        border: 1px solid #d6e5df;
+        border-radius: 10px;
+        background: #fafcfb;
+      }
+
+      .assign-mwl-tags-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        font-family: ui-monospace, Consolas, monospace;
+      }
+
+      .assign-mwl-tags-table th,
+      .assign-mwl-tags-table td {
+        padding: 8px 10px;
+        text-align: left;
+        border-bottom: 1px solid #e8efec;
+        vertical-align: top;
+      }
+
+      .assign-mwl-tags-table th {
+        position: sticky;
+        top: 0;
+        background: #f0f5f3;
+        font-family: inherit;
+        font-weight: 600;
+        color: #1a2e2b;
+        z-index: 1;
+      }
+
+      .assign-mwl-tags-table td.tag-col {
+        white-space: nowrap;
+        color: #005450;
+      }
+
+      .assign-mwl-tags-table td.name-col {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        color: #444;
+      }
+
+      .assign-mwl-tags-table td.value-col {
+        word-break: break-word;
+      }
+
+      .assign-mwl-tags-table tbody tr.is-priority {
+        background: #eef6f3;
+      }
+
+      .assign-mwl-tags-table tbody tr.is-priority td.name-col {
+        font-weight: 600;
+        color: #1a2e2b;
+      }
+
+      .assign-study-modal {
+        width: 720px;
+        max-width: calc(100vw - 32px);
+      }
+
+      .assign-study-modal .modal-body {
+        display: block;
+        padding: 16px 20px 12px;
+      }
+
+      .assign-mwl-filters {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px 16px;
+        margin-bottom: 12px;
+      }
+
+      .assign-mwl-filters .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .assign-mwl-filters label {
+        font-size: 13px;
+        color: #555;
+      }
+
+      .assign-mwl-filters input {
+        width: 100%;
+        min-width: 0;
+        padding: 10px 12px;
+        border: 2px solid #d6e5df;
+        border-radius: 8px;
+        font-size: 14px;
+        box-sizing: border-box;
+      }
+
+      .assign-mwl-filters .form-field-full {
+        grid-column: 1 / -1;
+      }
+
+      .assign-mwl-actions {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .assign-mwl-actions .button {
+        width: auto;
+        min-width: 120px;
+      }
+
+      .assign-mwl-status {
+        font-size: 13px;
+        color: #5a6b66;
+        margin-bottom: 10px;
+        min-height: 1.2em;
+      }
+
+      .assign-mwl-status.is-error {
+        color: #c62828;
+      }
+
+      .assign-mwl-table-wrap {
+        max-height: 320px;
+        overflow: auto;
+        border: 1px solid #d6e5df;
+        border-radius: 10px;
+        background: #fafcfb;
+      }
+
+      .assign-mwl-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      .assign-mwl-table th,
+      .assign-mwl-table td {
+        padding: 10px 12px;
+        text-align: left;
+        border-bottom: 1px solid #e8efec;
+      }
+
+      .assign-mwl-table th {
+        position: sticky;
+        top: 0;
+        background: #f0f5f3;
+        font-weight: 600;
+        color: #1a2e2b;
+        z-index: 1;
+      }
+
+      .assign-mwl-table tbody tr {
+        cursor: pointer;
+      }
+
+      .assign-mwl-table tbody tr:hover {
+        background: #edf5f2;
+      }
+
+      .assign-mwl-table tbody tr.is-selected {
+        background: #d9ebe6;
+      }
+
+      .assign-mwl-empty {
+        padding: 24px 16px;
+        text-align: center;
+        color: #8a9a94;
+        font-size: 13px;
+      }
+
+      #operation-success-modal.modal-overlay {
+        z-index: 1250;
+        background: rgba(22, 38, 36, 0.48);
+        backdrop-filter: blur(5px);
+      }
+
+      #operation-success-modal.modal-overlay.open .success-modal {
+        animation: operation-success-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+
+      @keyframes operation-success-in {
+        from {
+          opacity: 0;
+          transform: translateY(14px) scale(0.96);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .success-modal {
+        width: 420px;
+        max-width: calc(100vw - 32px);
+        text-align: center;
+        padding: 32px 28px 24px;
+        border: 1px solid rgba(0, 84, 80, 0.1);
+      }
+
+      .success-modal-icon {
+        width: 60px;
+        height: 60px;
+        margin: 0 auto 18px;
+        border-radius: 50%;
+        background: linear-gradient(145deg, #0d8a80 0%, #005450 100%);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 28px rgba(0, 84, 80, 0.32);
+      }
+
+      .success-modal-icon svg {
+        width: 30px;
+        height: 30px;
+        stroke: currentColor;
+        stroke-width: 2.5;
+        fill: none;
+      }
+
+      .success-modal-title {
+        font-size: 21px;
+        font-weight: 700;
+        color: #1a2e2b;
+        margin: 0 0 10px;
+        letter-spacing: -0.02em;
+      }
+
+      .success-modal-title:has(+ .success-modal-message.is-empty) {
+        margin-bottom: 24px;
+      }
+
+      .success-modal-message {
+        font-size: 14px;
+        color: #5a6b66;
+        line-height: 1.55;
+        margin: 0 0 24px;
+        max-width: 32ch;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .success-modal .button {
+        max-width: 220px;
+        margin: 0 auto;
+        padding: 12px 20px;
+        font-size: 14px;
+      }
+
+      .modal {
+        width: 640px;
+        max-width: calc(100vw - 40px);
+        background: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+        overflow: hidden;
+        transform: translateY(8px) scale(0.98);
+        opacity: 0;
+        transition: transform 220ms ease, opacity 220ms ease;
+      }
+
+      .modal-overlay.open .modal {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+      }
+
+      .modal-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid #eef2f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #f9fbfa;
+      }
+
+      .modal-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1f3b34;
+      }
+
+      .modal-body {
+        padding: 18px 20px 8px 20px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 12px 16px;
+        min-width: 0;
+      }
+
+      .modal-body .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .modal-body label {
+        font-size: 13px;
+        color: #555;
+      }
+
+      .modal-body input {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #d6e5df;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+
+      .modal-body input:focus {
+        outline: 2px solid #c4dacd;
+        border-color: #c4dacd;
+      }
+
+      .modal-footer {
+        padding: 14px 20px 18px 20px;
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        background: #fafcfb;
+        border-top: 1px solid #eef2f0;
+      }
+
+      .btn-secondary {
+        background: #e9ecef;
+        color: #222;
+      }
+      .btn-secondary:hover {
+        background: #dfe3e6;
+      }
+
+      /* PACS table styles with green tones (cleaner spacing) */
+      .pacs-table {
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .pacs-table th {
+        text-align: left;
+        padding: 12px 10px;
+        background: #e7f1ec;
+        color: #16483f;
+        border-bottom: 2px solid #c9dfd6;
+        font-weight: 600;
+      }
+      .pacs-table td {
+        padding: 10px 10px;
+        border-bottom: 1px solid #e9f2ee;
+        vertical-align: middle;
+      }
+      .pacs-table tr {
+        transition: background-color 180ms ease, transform 180ms ease;
+      }
+      .pacs-table tr.editing {
+        background: #eef8f3;
+      }
+      .pacs-table tr.editing td {
+        background: #eef8f3;
+      }
+      .pacs-table tr:nth-child(even) td {
+        background: #f6fbf9;
+      }
+      .pacs-table tr:hover td {
+        background: #edf7f3;
+      }
+      .pacs-table td:last-child {
+        width: 140px;
+      }
+      .pacs-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .pacs-table input {
+        width: 100%;
+        padding: 8px 10px;
+        border: 2px solid #d6e5df;
+        border-radius: 8px;
+        font-size: 14px;
+        background: #ffffff;
+      }
+      .pacs-table input:focus {
+        outline: 2px solid #c4dacd;
+        border-color: #c4dacd;
+      }
+      .btn-sm {
+        padding: 8px 14px;
+        font-size: 13px;
+        border-radius: 8px;
+      }
+
+      /* Simple list in admin panel */
+      .admin-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px 20px 4px 20px;
+        align-items: center;
+      }
+
+      .admin-actions > .button {
+        width: 100%;
+        max-width: 420px;
+      }
+
+      .admin-actions > .admin-row {
+        width: 100%;
+        max-width: 420px;
+      }
+
+      .admin-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border: 1px solid #e8eeeb;
+        border-radius: 10px;
+        background: #fbfdfc;
+      }
+
+      .admin-row .label {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .admin-row .label .title {
+        font-weight: 600;
+        color: #1f3b34;
+        font-size: 14px;
+      }
+
+      .admin-row .label .hint {
+        color: #667;
+        font-size: 12px;
+      }
+
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        user-select: none;
+      }
+
+      .toggle input {
+        width: 44px;
+        height: 24px;
+        appearance: none;
+        -webkit-appearance: none;
+        background: #cfd8d5;
+        border-radius: 999px;
+        position: relative;
+        outline: none;
+        cursor: pointer;
+        transition: background 160ms ease;
+      }
+
+      .toggle input::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        background: #fff;
+        border-radius: 999px;
+        transition: transform 160ms ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      .toggle input:checked {
+        background: #005450;
+      }
+
+      .toggle input:checked::after {
+        transform: translateX(20px);
+      }
+
+      .toggle input:focus {
+        outline: 2px solid #c4dacd;
+      }
+
+      .qr-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 20px 20px 10px 20px;
+        min-height: 360px;
+      }
+
+      .qr-img {
+        width: 280px;
+        height: 280px;
+        border-radius: 12px;
+        border: 1px solid #e8eeeb;
+        background: #ffffff;
+        display: block;
+      }
+
+      .qr-link {
+        display: none;
+      }
+
+      .qr-link-row {
+        width: 100%;
+        max-width: 560px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .qr-link-row.hidden {
+        display: none;
+      }
+
+      .copy-link-btn {
+        flex: 0 0 auto;
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+      }
+
+      .auth-wrap {
+        padding: 16px 20px 10px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .auth-msg {
+        font-size: 13px;
+        color: #556;
+        line-height: 1.4;
+      }
+
+      .auth-fields {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .auth-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .auth-field label {
+        font-size: 13px;
+        color: #555;
+      }
+
+      .auth-input-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+
+      .auth-field input {
+        padding: 10px 12px;
+        border: 2px solid #d6e5df;
+        border-radius: 8px;
+        font-size: 14px;
+        width: 100%;
+        padding-right: 44px;
+      }
+
+      .auth-field input:focus {
+        outline: 2px solid #c4dacd;
+        border-color: #c4dacd;
+      }
+
+      .eye-btn {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        height: 30px;
+        width: 34px;
+        border-radius: 8px;
+        border: 1px solid #d6e5df;
+        background: #f6fbf9;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #16483f;
+        padding: 0;
+      }
+
+      .eye-btn:hover {
+        background: #edf7f3;
+      }
+
+      .eye-btn:focus {
+        outline: 2px solid #c4dacd;
+      }
+
+      .eye-btn svg {
+        width: 18px;
+        height: 18px;
+        display: block;
+      }
+
+      /* Narrower auth modal only */
+      #auth-modal .modal {
+        width: 520px;
+        max-width: calc(100vw - 40px);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="left-panel">
+        <!-- Hidden trigger: Admin Panel is opened from the File menu -->
+        <button id="admin-btn" class="button" style="display: none">
+          Admin Panel
+        </button>
+
+        <div class="menu-shell">
+          <section class="menu-step">
+            <h2 class="step-title">Step 1: Scan or paste link</h2>
+            <div class="step-actions-row">
+              <button id="qr-scanner-btn" type="button" class="button">
+                Scan QR code
+              </button>
+              <button id="paste-link-btn" type="button" class="button button-outline">
+                Paste link
+              </button>
+            </div>
+            <div class="input-group portal-link-group">
+              <label for="url-input">Portal link</label>
+              <input
+                type="url"
+                id="url-input"
+                placeholder="Paste or scan URL"
+                value="https://hdsc.healthdataspace.de/hdscode2/#/login?hac=5BKW5NCQGD4E&bd=20010409"
+              />
+              <button id="load-btn" type="button" class="button load-portal-btn">
+                Load
+              </button>
+              <p id="portal-link-scan-status" class="portal-link-scan-status" aria-live="polite"></p>
+            </div>
+          </section>
+
+          <section class="menu-step">
+            <h2 class="step-title">Step 2: Assign patient</h2>
+            <div class="patient-card" id="patient-card">
+              <div class="patient-card-row">
+                <div class="patient-field">
+                  <span class="patient-field-label">Patient Name</span>
+                  <span class="patient-field-value meta-missing" id="meta-patient-name">Not available</span>
+                </div>
+                <div class="patient-field">
+                  <span class="patient-field-label">Patient ID</span>
+                  <span class="patient-field-value meta-missing" id="meta-patient-id">Not available</span>
+                </div>
+              </div>
+              <div class="patient-card-row">
+                <div class="patient-field">
+                  <span class="patient-field-label">Date of Birth</span>
+                  <span class="patient-field-value meta-missing" id="meta-dob">Not available</span>
+                </div>
+                <div class="patient-field">
+                  <span class="patient-field-label">Gender</span>
+                  <span class="patient-field-value meta-missing" id="meta-gender">Not available</span>
+                </div>
+              </div>
+              <div class="patient-field">
+                <span class="patient-field-label">Modality</span>
+                <span class="patient-field-value meta-missing" id="meta-modality">Not available</span>
+              </div>
+            </div>
+            <button id="assign-study-btn" type="button" class="button assign-study-btn">
+              Assign study
+            </button>
+            <button id="eye-btn" type="button" class="button hidden-ui" tabindex="-1" aria-hidden="true">
+              Open Selected Study
+            </button>
+          </section>
+
+          <section class="menu-step import-step">
+            <h2 class="step-title" id="import-step-title">Step 3: Import in progress…</h2>
+            <div id="import-progress-wrap">
+              <div class="progress-track" aria-hidden="true">
+                <div class="progress-fill" id="import-progress-fill"></div>
+              </div>
+              <p class="import-progress-text" id="import-progress-text">Ready to import</p>
+            </div>
+            <div class="import-actions">
+              <button id="add-to-pacs-btn" type="button" class="button">Save to PACS</button>
+              <button id="import-cancel-btn" type="button" class="button button-outline">
+                Cancel
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <div class="status" id="status">
+          Scan or paste a portal link to begin
+        </div>
+      </div>
+
+      <div class="right-panel">
+        <div class="preview-placeholder" id="preview-placeholder">
+          <div>🌐 Website preview will appear here.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PACS Modal -->
+    <div class="modal-overlay" id="pacs-modal">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pacs-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="pacs-title">Add PACS Details</div>
+          <button
+            id="pacs-close"
+            class="btn-secondary button"
+            style="padding: 8px 14px"
+          >
+            Close
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-field" style="grid-column: span 2">
+            <label for="pacs-node">Node name</label>
+            <input
+              id="pacs-node"
+              type="text"
+              placeholder="e.g. RadiologyPACS"
+            />
+          </div>
+          <div class="form-field">
+            <label for="pacs-ip">IP</label>
+            <input id="pacs-ip" type="text" placeholder="e.g. 192.168.1.10" />
+          </div>
+          <div class="form-field">
+            <label for="pacs-port">Port</label>
+            <input id="pacs-port" type="number" placeholder="e.g. 104" />
+          </div>
+          <div class="form-field" style="grid-column: span 2">
+            <label for="pacs-ae">AE Title</label>
+            <input id="pacs-ae" type="text" placeholder="e.g. PACS_AE" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="show-existing-pacs" class="btn-secondary button">
+            View PACS
+          </button>
+          <button id="save-pacs" class="button">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Send DICOM Modal -->
+    <div class="modal-overlay" id="send-modal">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="send-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="send-title">Send DICOM Files</div>
+          <button
+            id="send-close"
+            class="btn-secondary button"
+            style="padding: 8px 14px"
+          >
+            Close
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-field" style="grid-column: span 2">
+            <label for="send-ip">IP Address</label>
+            <input id="send-ip" type="text" placeholder="e.g. 192.168.1.10" />
+          </div>
+          <div class="form-field">
+            <label for="send-port">Port</label>
+            <input id="send-port" type="number" placeholder="e.g. 104" />
+          </div>
+          <div class="form-field">
+            <label for="send-ae">AE Title</label>
+            <input id="send-ae" type="text" placeholder="e.g. PACS_AE" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="send-submit" class="button">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Worklist settings (MWL / findscu) -->
+    <div class="modal-overlay" id="assign-study-settings-modal">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="assign-study-settings-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="assign-study-settings-title">Worklist Settings</div>
+          <button
+            id="assign-study-settings-close"
+            type="button"
+            class="btn-secondary button"
+            style="padding: 8px 14px"
+          >
+            Close
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-field" style="grid-column: span 2">
+            <label for="assign-study-settings-ip">IP Address</label>
+            <input
+              id="assign-study-settings-ip"
+              type="text"
+              placeholder="e.g. 102.67.142.34"
+            />
+          </div>
+          <div class="form-field">
+            <label for="assign-study-settings-port">Port</label>
+            <input
+              id="assign-study-settings-port"
+              type="number"
+              placeholder="e.g. 11114"
+            />
+          </div>
+          <div class="form-field">
+            <label for="assign-study-settings-ae">AE Title</label>
+            <input
+              id="assign-study-settings-ae"
+              type="text"
+              placeholder="e.g. RADSHARE"
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="assign-study-settings-save" type="button" class="button">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PACS Settings Modal -->
+    <div class="modal-overlay" id="send-settings-modal">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="send-settings-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="send-settings-title">PACS Settings</div>
+          <button
+            id="send-settings-close"
+            class="btn-secondary button"
+            style="padding: 8px 14px"
+          >
+            Close
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-field" style="grid-column: span 2">
+            <label for="send-settings-ip">IP Address</label>
+            <input
+              id="send-settings-ip"
+              type="text"
+              placeholder="e.g. 127.0.0.1"
+            />
+          </div>
+          <div class="form-field">
+            <label for="send-settings-port">Port</label>
+            <input
+              id="send-settings-port"
+              type="number"
+              placeholder="e.g. 11112"
+            />
+          </div>
+          <div class="form-field">
+            <label for="send-settings-ae">AE Title</label>
+            <input
+              id="send-settings-ae"
+              type="text"
+              placeholder="e.g. RADSHARE"
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="send-settings-save" class="button">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PACS List Modal -->
+    <div class="modal-overlay" id="pacs-list-modal">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pacs-list-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="pacs-list-title">PACS Entries</div>
+          <button
+            id="pacs-list-close"
+            class="btn-secondary button"
+            style="padding: 8px 14px"
+          >
+            Close
+          </button>
+        </div>
+        <div class="modal-body" style="display: block; padding: 16px 20px">
+          <div style="overflow: auto; max-height: 60vh">
+            <table
+              class="pacs-table"
+              style="width: 100%; border-collapse: collapse"
+            >
+              <thead>
+                <tr>
+                  <th>Node</th>
+                  <th>IP</th>
+                  <th>Port</th>
+                  <th>AE Title</th>
+                  <th style="width: 120px">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pacs-list-body">
+                <tr>
+                  <td
+                    colspan="5"
+                    style="text-align: center; color: #666; padding: 16px"
+                  >
+                    No PACS added yet
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer" style="justify-content: flex-end">
+          <button id="pacs-list-refresh" class="button btn-primary">
+            Refresh
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Panel Modal -->
+    <div class="modal-overlay" id="admin-modal">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="admin-title">Admin Panel</div>
+          <button
+            id="admin-close"
+            class="btn-secondary button"
+            style="padding: 8px 14px"
+          >
+            Close
+          </button>
+        </div>
+        <div class="admin-actions">
+          <div class="admin-row">
+            <div class="label">
+              <div class="title">Web Preview</div>
+              <div class="hint">Show/hide the right preview area</div>
+            </div>
+            <label class="toggle" title="Enable/Disable Web Preview">
+              <input id="admin-preview-toggle" type="checkbox" />
+            </label>
+          </div>
+          <button id="add-pacs-btn" type="button" class="button hidden-ui" tabindex="-1" aria-hidden="true">
+            Add PACS details
+          </button>
+          <button id="view-pacs-btn" type="button" class="button hidden-ui" tabindex="-1" aria-hidden="true">
+            View PACS
+          </button>
+          <button id="assign-study-settings-btn" type="button" class="button">
+            Worklist Settings
+          </button>
+          <button id="send-settings-btn" class="button">PACS Settings</button>
+          <button id="admin-change-password" class="button">
+            Change Password
+          </button>
+        </div>
+        <div class="modal-footer">
+          <button id="admin-done" class="button">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auth Modal (replaces browser prompt) -->
+    <div class="modal-overlay" id="auth-modal">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="auth-title">Admin</div>
+        </div>
+        <div class="auth-wrap">
+          <div class="auth-fields">
+            <div class="auth-field" id="auth-current-wrap">
+              <label for="auth-current">Current password</label>
+              <div class="auth-input-wrap">
+                <input
+                  id="auth-current"
+                  type="password"
+                  autocomplete="current-password"
+                />
+                <button
+                  id="auth-current-eye"
+                  class="eye-btn"
+                  type="button"
+                  aria-label="Show password"
+                  title="Show/Hide"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Z"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="auth-field" id="auth-new-wrap">
+              <label for="auth-new">New password</label>
+              <div class="auth-input-wrap">
+                <input id="auth-new" type="password" autocomplete="new-password" />
+                <button
+                  id="auth-new-eye"
+                  class="eye-btn"
+                  type="button"
+                  aria-label="Show password"
+                  title="Show/Hide"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Z"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="auth-cancel" class="btn-secondary button">Cancel</button>
+          <button id="auth-ok" class="button">Continue</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR Modal -->
+    <div class="modal-overlay" id="qr-modal">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="qr-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="qr-title">QR Code</div>
+          <button
+            id="qr-close"
+            class="btn-secondary button"
+            style="padding: 8px 14px"
+          >
+            Close
+          </button>
+        </div>
+        <div class="qr-wrap">
+          <img id="qr-image" class="qr-img" alt="QR Code" />
+          <div id="qr-link-row" class="qr-link-row hidden">
+            <div id="qr-link" class="qr-link"></div>
+            <button id="copy-download-link" class="button copy-link-btn">
+              Copy Link
+            </button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="qr-done" class="button">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assign study — MWL search -->
+    <div class="modal-overlay" id="assign-study-modal">
+      <div
+        class="modal assign-study-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="assign-study-modal-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="assign-study-modal-title">Select study from worklist</div>
+          <button
+            id="assign-study-modal-close"
+            type="button"
+            class="btn-secondary button"
+            style="padding: 8px 14px"
+          >
+            Close
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="assign-mwl-filters">
+            <div class="form-field">
+              <label for="assign-mwl-start">Start date</label>
+              <input id="assign-mwl-start" type="date" />
+            </div>
+            <div class="form-field">
+              <label for="assign-mwl-end">End date</label>
+              <input id="assign-mwl-end" type="date" />
+            </div>
+            <div class="form-field form-field-full">
+              <label for="assign-mwl-search">Search (name, ID, or accession)</label>
+              <input
+                id="assign-mwl-search"
+                type="text"
+                placeholder="Optional filter on results"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+          <div class="assign-mwl-actions">
+            <button id="assign-mwl-run" type="button" class="button">Search</button>
+          </div>
+          <p class="assign-mwl-status" id="assign-mwl-status">Set dates and click Search.</p>
+          <div class="assign-mwl-table-wrap">
+            <table class="assign-mwl-table" id="assign-mwl-table">
+              <thead>
+                <tr>
+                  <th>Patient name</th>
+                  <th>Patient ID</th>
+                  <th>Accession</th>
+                  <th>Modality</th>
+                </tr>
+              </thead>
+              <tbody id="assign-mwl-tbody"></tbody>
+            </table>
+            <div class="assign-mwl-empty hidden-ui" id="assign-mwl-empty">No studies found for this range.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="assign-mwl-cancel" type="button" class="btn-secondary button">Cancel</button>
+          <button id="assign-mwl-confirm" type="button" class="button" disabled>Assign</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MWL row — all DICOM tags from findscu response -->
+    <div class="modal-overlay" id="assign-mwl-tags-modal">
+      <div
+        class="modal assign-mwl-tags-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="assign-mwl-tags-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="assign-mwl-tags-title">DICOM tags</div>
+          <button
+            id="assign-mwl-tags-close"
+            type="button"
+            class="btn-secondary button"
+            style="padding: 8px 14px"
+          >
+            Close
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="assign-mwl-tags-subtitle" id="assign-mwl-tags-subtitle"></p>
+          <div class="assign-mwl-tags-search-row">
+            <label class="hidden-ui" for="assign-mwl-tags-search">Search tags</label>
+            <input
+              id="assign-mwl-tags-search"
+              type="search"
+              placeholder="Search tag, name, or value…"
+              autocomplete="off"
+            />
+          </div>
+          <div class="assign-mwl-tags-wrap">
+            <table class="assign-mwl-tags-table">
+              <thead>
+                <tr>
+                  <th>Tag</th>
+                  <th>Name</th>
+                  <th>VR</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody id="assign-mwl-tags-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer" style="justify-content: flex-end">
+          <button id="assign-mwl-tags-done" type="button" class="button">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Operation complete (Load / Assign / Save to PACS) -->
+    <div class="modal-overlay" id="operation-success-modal">
+      <div
+        class="modal success-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="operation-success-title"
+      >
+        <div class="success-modal-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <h3 class="success-modal-title" id="operation-success-title">Success</h3>
+        <p class="success-modal-message" id="operation-success-message"></p>
+        <button id="operation-success-ok" type="button" class="button">Done</button>
+      </div>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>
