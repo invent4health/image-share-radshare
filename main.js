@@ -165,6 +165,7 @@ async function createWindow() {
     const initialBounds = getCenteredWindowBounds(MENU_ONLY_WINDOW_WIDTH, initialHeight);
     mainWindow = new BrowserWindow({
         ...initialBounds,
+        title: 'Cognizance Health',
         icon: winIcon || undefined,
         webPreferences: {
             preload: path.join(__dirname, 'preload.cjs'),
@@ -1216,7 +1217,7 @@ ipcMain.handle('trigger-eye', async () => {
 });
 
 app.whenReady().then(async () => {
-    try { app.setName('RADSHARE'); } catch { }
+    try { app.setName('Cognizance Health'); } catch { }
     // Helps Windows pick up the correct taskbar icon/app identity
     try { app.setAppUserModelId('com.web-previewer.app'); } catch { }
     setAppMenu();

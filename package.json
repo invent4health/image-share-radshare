@@ -1,7 +1,7 @@
 {
   "name": "automation-toolv2",
   "version": "1.0.0",
-  "description": "RADSHARE - Electron app to load studies and send DICOM images to PACS.",
+  "description": "Cognizance Health - Electron app to load studies and send DICOM images to PACS.",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -37,7 +37,7 @@
   },
   "build": {
     "appId": "com.web-previewer.app",
-    "productName": "RADSHARE",
+    "productName": "Cognizance Health",
     "directories": {
       "buildResources": "."
     },
