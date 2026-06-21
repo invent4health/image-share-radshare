@@ -107,6 +107,25 @@ function isHdscPortalUrl(portalUrl) {
 	return /hdsc/i.test(String(portalUrl || ''));
 }
 
+function isJivexPortalUrl(portalUrl) {
+	return /jivexmobile\.visus\.com/i.test(String(portalUrl || ''));
+}
+
+function extractJivexCode(portalUrl) {
+	try {
+		const parsed = new URL(String(portalUrl || '').trim());
+		return parsed.searchParams.get('code') || null;
+	} catch {
+		const m = String(portalUrl || '').match(/[?&]code=([^&#]+)/i);
+		return m ? decodeURIComponent(m[1]) : null;
+	}
+}
+
+function extractJivexStudyKey(portalUrl) {
+	const code = extractJivexCode(portalUrl);
+	return code ? `jivex-${code}` : null;
+}
+
 function extractHdscStudyId(portalUrl) {
 	try {
 		const parsed = new URL(String(portalUrl || '').trim());
@@ -125,6 +144,9 @@ function getStudyUidForCurrentPortal() {
 	if (!portal) return null;
 	if (isHdscPortalUrl(portal)) {
 		return hdscLoadedStudyUid || extractHdscStudyId(portal);
+	}
+	if (isJivexPortalUrl(portal)) {
+		return hdscLoadedStudyUid || extractJivexStudyKey(portal);
 	}
 	return extractStudyInstanceUid(portal);
 }
@@ -166,6 +188,13 @@ function getDownloadUrlForCurrentStudy() {
 			return { ok: false, reason: 'Load the HDSC study first' };
 		}
 		return { ok: true, url: portal, studyUid, hdsc: true };
+	}
+	if (isJivexPortalUrl(portal)) {
+		const studyUid = getStudyUidForCurrentPortal();
+		if (!studyUid) {
+			return { ok: false, reason: 'Load the study first' };
+		}
+		return { ok: true, url: portal, studyUid, mapped: true };
 	}
 	const url = buildDownloadUrlFromPortalLink(portal);
 	if (!url) {
@@ -266,6 +295,18 @@ function togglePlaceholder(show) {
 	previewPlaceholder.classList.toggle('hidden', !show);
 }
 
+async function downloadMappedPortalStudyAndShowMetadata(portalUrl) {
+	if (!window.electronAPI?.downloadPortalFallbackStudy) {
+		throw new Error('Portal download not available');
+	}
+	const dl = await window.electronAPI.downloadPortalFallbackStudy(portalUrl);
+	if (dl?.noFallback) return null;
+	if (!dl?.ok) throw new Error(dl?.error || 'Portal download failed');
+	hdscLoadedStudyUid = dl.studyUid || extractJivexStudyKey(portalUrl) || null;
+	await applyMetadataFromDownload(dl);
+	return dl;
+}
+
 async function downloadHdscStudyAndShowMetadata(portalUrl) {
 	if (!window.electronAPI?.hdscDownloadStudy) {
 		throw new Error('HDSC download not available');
@@ -279,6 +320,18 @@ async function downloadHdscStudyAndShowMetadata(portalUrl) {
 
 async function downloadStudyAndShowMetadata({ progressMode = 'load' } = {}) {
 	const portal = urlInput?.value?.trim();
+
+	if (!isHdscPortalUrl(portal) && window.electronAPI?.downloadPortalFallbackStudy) {
+		startDownloadProgressListener(progressMode);
+		if (progressMode === 'load') setLoadButtonProgress(true);
+		try {
+			const mapped = await downloadMappedPortalStudyAndShowMetadata(portal);
+			if (mapped) return mapped;
+		} finally {
+			stopDownloadProgressListener();
+		}
+	}
+
 	if (isHdscPortalUrl(portal)) {
 		startDownloadProgressListener(progressMode);
 		if (progressMode === 'load') setLoadButtonProgress(true);
@@ -341,7 +394,10 @@ async function loadWebsite() {
 
 	try {
 		const hdsc = isHdscPortalUrl(url);
-		updateStatus(hdsc ? 'Downloading from HDSC…' : 'Downloading study…');
+		const jivex = isJivexPortalUrl(url);
+		updateStatus(
+			hdsc ? 'Downloading from HDSC…' : jivex ? 'Downloading study…' : 'Downloading study…'
+		);
 
 		if (hdsc && window.electronAPI?.webPreviewGetEnabled) {
 			const previewRes = await window.electronAPI.webPreviewGetEnabled();
@@ -353,8 +409,8 @@ async function loadWebsite() {
 		await downloadStudyAndShowMetadata({ progressMode: 'load' });
 		scrollPatientCardIntoView();
 
-		if (hdsc) {
-			updateStatus('Study loaded from HDSC');
+		if (hdsc || jivex) {
+			updateStatus(hdsc ? 'Study loaded from HDSC' : 'Study loaded');
 			showLoadSuccessPopup();
 			return;
 		}

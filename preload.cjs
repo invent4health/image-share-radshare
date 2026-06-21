@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	qrGenerate: (url) => ipcRenderer.invoke('qr-generate', url),
 	downloadZip: (url, options) => ipcRenderer.invoke('download-zip', url, options),
 	hdscDownloadStudy: (portalUrl) => ipcRenderer.invoke('hdsc-download-study', portalUrl),
+	downloadPortalFallbackStudy: (portalUrl) => ipcRenderer.invoke('portal-fallback-download', portalUrl),
 	getDownloadedStudy: (studyUid) => ipcRenderer.invoke('get-downloaded-study', studyUid),
 	onDownloadProgress: (handler) => {
 		if (typeof handler !== 'function') return () => {};

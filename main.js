@@ -14,7 +14,7 @@ import { readMetadataFromZip } from './lib/dicom-metadata.js';
 import { queryMwlWorklist } from './lib/findscu-mwl.js';
 import { applyAssignedMetadataToDicomFiles } from './lib/dicom-modify.js';
 import { downloadHdscStudyFromPreview, injectHdscSavePickerHook, isHdscPortalUrl } from './lib/hdsc-download.js';
-import { downloadGoogleDriveToFile, resolveHdscFallbackDownload } from './lib/hdsc-fallback-sources.js';
+import { downloadGoogleDriveToFile, resolveHdscFallbackDownload, resolvePortalFallbackDownload } from './lib/hdsc-fallback-sources.js';
 
 // Keep hidden pages at full speed (match Chrome/Edge — no background throttling)
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
@@ -651,6 +651,58 @@ ipcMain.handle('download-zip', async (event, url, options = {}) => {
     }
 });
 
+async function downloadMappedPortalZip(event, fallback, logLabel = 'Portal') {
+    const downloadsDir = path.join(app.getPath('downloads'), 'radshare-hdsc');
+    fs.mkdirSync(downloadsDir, { recursive: true });
+    const safeName = (fallback.filename || 'study.zip').replace(/[<>:"/\\|?*]/g, '_');
+    let outPath = path.join(downloadsDir, safeName);
+    if (fs.existsSync(outPath)) {
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const ext = path.extname(safeName);
+        const base = safeName.slice(0, safeName.length - ext.length);
+        outPath = path.join(downloadsDir, `${base}-${stamp}${ext}`);
+    }
+
+    console.log(`[${logLabel}] Using mapped zip source:`, fallback.sourceUrl);
+    const reportProgress = (data) => {
+        try {
+            event.sender.send('download-progress', data);
+        } catch { /* ignore */ }
+    };
+    await downloadGoogleDriveToFile(fallback.sourceUrl, outPath, reportProgress);
+
+    lastDownloadedZipPath = outPath;
+    if (fallback.studyUid) lastDownloadedStudyUid = fallback.studyUid;
+
+    const metaResult = await readMetadataFromZip(outPath);
+    return {
+        ok: true,
+        path: outPath,
+        studyUid: fallback.studyUid || null,
+        metadata: metaResult.ok ? metaResult.metadata : null,
+        metadataAvailability: metaResult.ok ? metaResult.availability : null,
+        metadataWarnings: metaResult.warnings || (metaResult.ok ? [] : [metaResult.reason]),
+        source: 'fallback',
+    };
+}
+
+ipcMain.handle('portal-fallback-download', async (event, portalUrl) => {
+    try {
+        const url = String(portalUrl || '').trim();
+        if (!url) return { ok: false, noFallback: true };
+
+        const fallback = resolvePortalFallbackDownload(url);
+        if (!fallback) return { ok: false, noFallback: true };
+
+        // HDSC mapped links use hdsc-download-study (browser automation fallback path)
+        if (isHdscPortalUrl(url)) return { ok: false, noFallback: true };
+
+        return await downloadMappedPortalZip(event, fallback, 'Portal');
+    } catch (e) {
+        return { ok: false, error: e?.message || 'Portal download failed' };
+    }
+});
+
 ipcMain.handle('hdsc-download-study', async (event, portalUrl) => {
     try {
         const url = String(portalUrl || '').trim();
@@ -660,38 +712,7 @@ ipcMain.handle('hdsc-download-study', async (event, portalUrl) => {
 
         const fallback = resolveHdscFallbackDownload(url);
         if (fallback) {
-            const downloadsDir = path.join(app.getPath('downloads'), 'radshare-hdsc');
-            fs.mkdirSync(downloadsDir, { recursive: true });
-            const safeName = (fallback.filename || 'study.zip').replace(/[<>:"/\\|?*]/g, '_');
-            let outPath = path.join(downloadsDir, safeName);
-            if (fs.existsSync(outPath)) {
-                const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const ext = path.extname(safeName);
-                const base = safeName.slice(0, safeName.length - ext.length);
-                outPath = path.join(downloadsDir, `${base}-${stamp}${ext}`);
-            }
-
-            console.log('[HDSC] Using mapped zip source:', fallback.sourceUrl);
-            const reportProgress = (data) => {
-                try {
-                    event.sender.send('download-progress', data);
-                } catch { /* ignore */ }
-            };
-            await downloadGoogleDriveToFile(fallback.sourceUrl, outPath, reportProgress);
-
-            lastDownloadedZipPath = outPath;
-            if (fallback.studyUid) lastDownloadedStudyUid = fallback.studyUid;
-
-            const metaResult = await readMetadataFromZip(outPath);
-            return {
-                ok: true,
-                path: outPath,
-                studyUid: fallback.studyUid || null,
-                metadata: metaResult.ok ? metaResult.metadata : null,
-                metadataAvailability: metaResult.ok ? metaResult.availability : null,
-                metadataWarnings: metaResult.warnings || (metaResult.ok ? [] : [metaResult.reason]),
-                source: 'fallback',
-            };
+            return await downloadMappedPortalZip(event, fallback, 'HDSC');
         }
 
         const showInPreview = webPreviewEnabled;
