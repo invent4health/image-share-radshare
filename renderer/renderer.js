@@ -42,7 +42,6 @@ const assignMwlTagsClose = document.getElementById('assign-mwl-tags-close');
 const assignMwlTagsDone = document.getElementById('assign-mwl-tags-done');
 const assignMwlTagsSearch = document.getElementById('assign-mwl-tags-search');
 const addToPacsBtn = document.getElementById('add-to-pacs-btn');
-const importCancelBtn = document.getElementById('import-cancel-btn');
 const importProgressFill = document.getElementById('import-progress-fill');
 const importProgressText = document.getElementById('import-progress-text');
 const importStepTitle = document.getElementById('import-step-title');
@@ -51,6 +50,10 @@ const operationSuccessModal = document.getElementById('operation-success-modal')
 const operationSuccessTitle = document.getElementById('operation-success-title');
 const operationSuccessMessage = document.getElementById('operation-success-message');
 const operationSuccessOk = document.getElementById('operation-success-ok');
+const jivexPasswordModal = document.getElementById('jivex-password-modal');
+const jivexPortalPasswordInput = document.getElementById('jivex-portal-password');
+const jivexPasswordContinue = document.getElementById('jivex-password-continue');
+const jivexPasswordCancel = document.getElementById('jivex-password-cancel');
 const sendModal = document.getElementById('send-modal');
 const sendClose = document.getElementById('send-close');
 const sendSubmit = document.getElementById('send-submit');
@@ -68,6 +71,9 @@ const assignStudySettingsSave = document.getElementById('assign-study-settings-s
 const assignStudySettingsIp = document.getElementById('assign-study-settings-ip');
 const assignStudySettingsPort = document.getElementById('assign-study-settings-port');
 const assignStudySettingsAe = document.getElementById('assign-study-settings-ae');
+const downloadsPanel = document.getElementById('downloads-panel');
+const downloadsList = document.getElementById('downloads-list');
+const downloadsPanelClose = document.getElementById('downloads-panel-close');
 
 // Admin + QR
 const adminBtn = document.getElementById('admin-btn');
@@ -97,8 +103,107 @@ const qrLink = document.getElementById('qr-link');
 const qrLinkRow = document.getElementById('qr-link-row');
 const copyDownloadLinkBtn = document.getElementById('copy-download-link');
 
+const languageModal = document.getElementById('language-modal');
+const languageEnglish = document.getElementById('language-english');
+const languageGerman = document.getElementById('language-german');
+const languageCancel = document.getElementById('language-cancel');
+
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const settingsClose = document.getElementById('settings-close');
+const settingsAdminPanel = document.getElementById('settings-admin-panel');
+const settingsChangeLanguage = document.getElementById('settings-change-language');
+const settingsPreviewToggle = document.getElementById('settings-preview-toggle');
+
+const t = (key) => window.i18n?.t(key) ?? key;
+
 let scanCompleteTimer = null;
 let wedgeScanActive = false;
+
+function refreshDynamicLabels() {
+	if (loadBtn && !loadInProgress) loadBtn.textContent = t('load');
+	if (assignStudyBtn && !assignStudyInProgress) assignStudyBtn.textContent = t('assignStudy');
+	if (importProgressText && !importInProgress) importProgressText.textContent = t('readyToImport');
+	for (const el of [metaPatientName, metaPatientId, metaDob, metaGender, metaModality]) {
+		if (el?.classList.contains('meta-missing')) el.textContent = t('notAvailable');
+	}
+	updateLanguageModalSelection();
+}
+
+function updateLanguageModalSelection() {
+	const lang = window.i18n?.getLanguage?.() || 'en';
+	languageEnglish?.classList.toggle('is-selected', lang === 'en');
+	languageGerman?.classList.toggle('is-selected', lang === 'de');
+}
+
+function openLanguageModal() {
+	updateLanguageModalSelection();
+	if (languageModal) openModal(languageModal);
+}
+
+async function syncSettingsPreviewToggle() {
+	if (!settingsPreviewToggle) return;
+	try {
+		if (window.electronAPI?.webPreviewGetEnabled) {
+			const res = await window.electronAPI.webPreviewGetEnabled();
+			if (res?.ok) settingsPreviewToggle.checked = Boolean(res.enabled);
+		}
+	} catch { /* ignore */ }
+}
+
+function openSettingsModal() {
+	syncSettingsPreviewToggle();
+	if (settingsModal) openModal(settingsModal);
+}
+
+function closeSettingsModal() {
+	if (settingsModal) closeModal(settingsModal);
+	resumePreviewIfIdle();
+}
+
+function openLanguageFromSettings() {
+	closeSettingsModal();
+	openLanguageModal();
+}
+
+async function openAdminFromSettings() {
+	closeSettingsModal();
+	await handleAdminClick();
+}
+
+function closeLanguageModal() {
+	if (languageModal) closeModal(languageModal);
+	resumePreviewIfIdle();
+}
+
+function selectLanguage(lang) {
+	window.i18n?.setLanguage(lang);
+	refreshDynamicLabels();
+	closeLanguageModal();
+}
+
+document.addEventListener('app-language-changed', () => {
+	refreshDynamicLabels();
+	if (window.electronAPI?.webPreviewGetEnabled) {
+		window.electronAPI.webPreviewGetEnabled().then((res) => {
+			if (res?.ok) applyWebPreviewEnabled(res.enabled);
+		}).catch(() => {});
+	}
+});
+
+window.i18n?.initLanguage();
+
+(async () => {
+	try {
+		if (window.electronAPI?.getAppLanguage) {
+			const res = await window.electronAPI.getAppLanguage();
+			if (res?.ok && (res.lang === 'de' || res.lang === 'en') && res.lang !== window.i18n?.getLanguage()) {
+				window.i18n?.applyLanguage(res.lang);
+			}
+		}
+	} catch { /* ignore */ }
+	refreshDynamicLabels();
+})();
 
 const DCM4CHEE_DOWNLOAD_BASE =
 	'http://102.67.142.34:8084/dcm4chee-arc/aets/RADSHARE/rs/studies';
@@ -234,19 +339,144 @@ function updateStatus(message, isError = false) {
 }
 
 let unloadDownloadProgress = null;
+let unloadBrowserDownloadProgress = null;
 let loadDotsInterval = null;
+
+function formatDownloadBytes(bytes) {
+	const n = Number(bytes) || 0;
+	if (n <= 0) return '0 B';
+	if (n < 1024) return `${n} B`;
+	if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+	return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function showDownloadsPanel() {
+	downloadsPanel?.classList.remove('is-hidden');
+}
+
+function hideDownloadsPanel() {
+	downloadsPanel?.classList.add('is-hidden');
+}
+
+let downloadsHideTimer = null;
+
+function scheduleHideDownloadsPanel(delayMs = 1500) {
+	if (downloadsHideTimer) clearTimeout(downloadsHideTimer);
+	downloadsHideTimer = setTimeout(() => {
+		downloadsHideTimer = null;
+		resetDownloadsPanel();
+	}, delayMs);
+}
+
+function resetDownloadsPanel() {
+	if (downloadsList) downloadsList.innerHTML = '';
+	hideDownloadsPanel();
+}
+
+function renderBrowserDownloadProgress(payload) {
+	if (!downloadsList || !payload) return;
+	showDownloadsPanel();
+
+	let row = downloadsList.querySelector('[data-download-id="active"]');
+	if (!row) {
+		row = document.createElement('div');
+		row.className = 'downloads-item';
+		row.dataset.downloadId = 'active';
+		row.innerHTML = `
+			<div class="downloads-item-name"></div>
+			<div class="downloads-item-track"><div class="downloads-item-bar"></div></div>
+			<div class="downloads-item-meta"></div>
+		`;
+		downloadsList.prepend(row);
+	}
+
+	const nameEl = row.querySelector('.downloads-item-name');
+	const barEl = row.querySelector('.downloads-item-bar');
+	const metaEl = row.querySelector('.downloads-item-meta');
+	const filename = payload.filename || 'download.zip';
+
+	row.classList.remove('is-failed', 'is-complete');
+	barEl.classList.remove('is-complete');
+
+	if (payload.state === 'preparing') {
+		if (downloadsHideTimer) {
+			clearTimeout(downloadsHideTimer);
+			downloadsHideTimer = null;
+		}
+		nameEl.textContent = filename;
+		barEl.classList.add('is-indeterminate');
+		metaEl.textContent = payload.message || t('downloadPreparing');
+		return;
+	}
+
+	if (payload.state === 'failed') {
+		nameEl.textContent = filename;
+		barEl.classList.remove('is-indeterminate');
+		barEl.style.width = '0%';
+		metaEl.textContent = payload.error || t('downloadFailed');
+		row.classList.add('is-failed');
+		return;
+	}
+
+	if (payload.state === 'completed') {
+		nameEl.textContent = filename;
+		barEl.classList.remove('is-indeterminate');
+		barEl.classList.add('is-complete');
+		barEl.style.width = '100%';
+		const size = formatDownloadBytes(payload.received || payload.total);
+		metaEl.textContent = `${t('downloadComplete')} — ${size}`;
+		row.classList.add('is-complete');
+		scheduleHideDownloadsPanel(1500);
+		return;
+	}
+
+	const received = payload.received || 0;
+	const total = payload.total || 0;
+	const percent = payload.percent ?? (total > 0 ? Math.min(100, Math.floor((received / total) * 100)) : null);
+
+	nameEl.textContent = filename;
+	barEl.style.width = percent != null ? `${percent}%` : '35%';
+	if (percent == null) barEl.classList.add('is-indeterminate');
+	else barEl.classList.remove('is-indeterminate');
+
+	const left = formatDownloadBytes(received);
+	const right = total > 0 ? formatDownloadBytes(total) : '…';
+	metaEl.textContent = percent != null ? `${percent}% — ${left} / ${right}` : `${t('downloadingProgress')} — ${left}`;
+	if (percent != null && percent >= 100) {
+		scheduleHideDownloadsPanel(1500);
+	}
+}
 
 function stopDownloadProgressListener() {
 	if (unloadDownloadProgress) {
 		unloadDownloadProgress();
 		unloadDownloadProgress = null;
 	}
+	if (unloadBrowserDownloadProgress) {
+		unloadBrowserDownloadProgress();
+		unloadBrowserDownloadProgress = null;
+	}
 }
 
 function startDownloadProgressListener(_mode) {
 	stopDownloadProgressListener();
-	// Load uses dots only — progress events must not restart the animation
+	if (window.electronAPI?.onDownloadProgress) {
+		unloadDownloadProgress = window.electronAPI.onDownloadProgress((payload) => {
+			renderBrowserDownloadProgress({
+				state: 'progressing',
+				filename: payload?.filename || 'download.zip',
+				received: payload?.received,
+				total: payload?.total,
+				percent: payload?.percent,
+			});
+		});
+	}
+	if (window.electronAPI?.onBrowserDownloadProgress) {
+		unloadBrowserDownloadProgress = window.electronAPI.onBrowserDownloadProgress(renderBrowserDownloadProgress);
+	}
 }
+
+downloadsPanelClose?.addEventListener('click', hideDownloadsPanel);
 
 function stopLoadDotsAnimation() {
 	if (loadDotsInterval) {
@@ -259,10 +489,10 @@ function startLoadDotsAnimation() {
 	stopLoadDotsAnimation();
 	if (!loadBtn) return;
 	let step = 0;
-	loadBtn.textContent = 'Downloading.';
+	loadBtn.textContent = `${t('downloading')}.`;
 	loadDotsInterval = setInterval(() => {
 		step = (step + 1) % 3;
-		loadBtn.textContent = `Downloading${'.'.repeat(step + 1)}`;
+		loadBtn.textContent = `${t('downloading')}${'.'.repeat(step + 1)}`;
 	}, 450);
 }
 
@@ -275,7 +505,7 @@ function setLoadButtonProgress(active) {
 		if (!loadDotsInterval) startLoadDotsAnimation();
 	} else {
 		stopLoadDotsAnimation();
-		loadBtn.textContent = 'Load';
+		loadBtn.textContent = t('load');
 	}
 }
 
@@ -287,12 +517,27 @@ function setAssignStudyAnimating(active) {
 	if (!assignStudyBtn) return;
 	assignStudyBtn.disabled = active;
 	assignStudyBtn.classList.toggle('is-assigning', active);
-	assignStudyBtn.textContent = active ? 'Assigning study…' : 'Assign study';
+	assignStudyBtn.textContent = active ? t('assigningStudy') : t('assignStudy');
 }
 
 // Hide/show preview placeholder
 function togglePlaceholder(show) {
 	previewPlaceholder.classList.toggle('hidden', !show);
+}
+
+async function downloadJivexStudyAndShowMetadata(portalUrl, password) {
+	if (!window.electronAPI?.jivexDownloadStudy) {
+		throw new Error('Jivex download not available');
+	}
+	const dl = await window.electronAPI.jivexDownloadStudy({
+		portalUrl,
+		password,
+		user: extractJivexCode(portalUrl) || '',
+	});
+	if (!dl?.ok) throw new Error(dl?.error || 'Jivex download failed');
+	hdscLoadedStudyUid = dl.studyUid || extractJivexStudyKey(portalUrl) || null;
+	await applyMetadataFromDownload(dl);
+	return dl;
 }
 
 async function downloadMappedPortalStudyAndShowMetadata(portalUrl) {
@@ -321,7 +566,7 @@ async function downloadHdscStudyAndShowMetadata(portalUrl) {
 async function downloadStudyAndShowMetadata({ progressMode = 'load' } = {}) {
 	const portal = urlInput?.value?.trim();
 
-	if (!isHdscPortalUrl(portal) && window.electronAPI?.downloadPortalFallbackStudy) {
+	if (!isHdscPortalUrl(portal) && !isJivexPortalUrl(portal) && window.electronAPI?.downloadPortalFallbackStudy) {
 		startDownloadProgressListener(progressMode);
 		if (progressMode === 'load') setLoadButtonProgress(true);
 		try {
@@ -369,6 +614,59 @@ function scrollPatientCardIntoView() {
 	if (patientCard) patientCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+function promptJivexPassword() {
+	return new Promise((resolve) => {
+		if (!jivexPasswordModal) {
+			resolve(null);
+			return;
+		}
+		if (jivexPortalPasswordInput) jivexPortalPasswordInput.value = '';
+
+		let settled = false;
+		const finish = (value) => {
+			if (settled) return;
+			settled = true;
+			closeModal(jivexPasswordModal);
+			window.electronAPI?.previewResume?.();
+			cleanup();
+			resolve(value);
+		};
+		const onContinue = () => {
+			const pass = jivexPortalPasswordInput?.value?.trim();
+			if (!pass) {
+				jivexPortalPasswordInput?.focus();
+				return;
+			}
+			finish(pass);
+		};
+		const onCancel = () => finish(null);
+		const onOverlay = (e) => {
+			if (e.target === jivexPasswordModal) onCancel();
+		};
+		const onKey = (e) => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				onContinue();
+			}
+			if (e.key === 'Escape') onCancel();
+		};
+		function cleanup() {
+			jivexPasswordContinue?.removeEventListener('click', onContinue);
+			jivexPasswordCancel?.removeEventListener('click', onCancel);
+			jivexPasswordModal?.removeEventListener('click', onOverlay);
+			jivexPortalPasswordInput?.removeEventListener('keydown', onKey);
+		}
+
+		jivexPasswordContinue?.addEventListener('click', onContinue);
+		jivexPasswordCancel?.addEventListener('click', onCancel);
+		jivexPasswordModal?.addEventListener('click', onOverlay);
+		jivexPortalPasswordInput?.addEventListener('keydown', onKey);
+		window.electronAPI?.previewSuspend?.();
+		openModal(jivexPasswordModal);
+		setTimeout(() => jivexPortalPasswordInput?.focus(), 100);
+	});
+}
+
 // Load: download study, read DICOM metadata, optionally open web preview
 async function loadWebsite() {
 	const url = urlInput.value.trim();
@@ -387,6 +685,35 @@ async function loadWebsite() {
 
 	if (assignStudyInProgress || importInProgress || loadInProgress) return;
 
+	const jivex = isJivexPortalUrl(url);
+	if (jivex) {
+		const password = await promptJivexPassword();
+		if (!password) return;
+
+		loadInProgress = true;
+		setLoadButtonProgress(true);
+		clearAssignedStudyMetadata();
+		hdscLoadedStudyUid = null;
+		resetDownloadsPanel();
+
+		try {
+			updateStatus(t('downloadingBackground'));
+			startDownloadProgressListener('load');
+			await downloadJivexStudyAndShowMetadata(url, password);
+			scrollPatientCardIntoView();
+			updateStatus(t('studyLoaded'));
+			showLoadSuccessPopup();
+		} catch (error) {
+			clearPatientMetadata();
+			updateStatus(error?.message || t('studyLoadFailed'), true);
+		} finally {
+			stopDownloadProgressListener();
+			loadInProgress = false;
+			setLoadButtonProgress(false);
+		}
+		return;
+	}
+
 	loadInProgress = true;
 	setLoadButtonProgress(true);
 	clearAssignedStudyMetadata();
@@ -394,10 +721,7 @@ async function loadWebsite() {
 
 	try {
 		const hdsc = isHdscPortalUrl(url);
-		const jivex = isJivexPortalUrl(url);
-		updateStatus(
-			hdsc ? 'Downloading from HDSC…' : jivex ? 'Downloading study…' : 'Downloading study…'
-		);
+		updateStatus(hdsc ? 'Downloading from HDSC…' : 'Downloading study…');
 
 		if (hdsc && window.electronAPI?.webPreviewGetEnabled) {
 			const previewRes = await window.electronAPI.webPreviewGetEnabled();
@@ -409,8 +733,8 @@ async function loadWebsite() {
 		await downloadStudyAndShowMetadata({ progressMode: 'load' });
 		scrollPatientCardIntoView();
 
-		if (hdsc || jivex) {
-			updateStatus(hdsc ? 'Study loaded from HDSC' : 'Study loaded');
+		if (hdsc) {
+			updateStatus('Study loaded from HDSC');
 			showLoadSuccessPopup();
 			return;
 		}
@@ -429,7 +753,7 @@ async function loadWebsite() {
 		showLoadSuccessPopup();
 	} catch (error) {
 		clearPatientMetadata();
-		updateStatus(error?.message || 'Load failed', true);
+		updateStatus(error?.message || t('studyLoadFailed'), true);
 		togglePlaceholder(true);
 	} finally {
 		loadInProgress = false;
@@ -553,7 +877,7 @@ urlInput.addEventListener('input', () => {
 });
 
 // Initial state (updated once web preview state is known)
-updateStatus('Scan or paste a portal link to begin');
+updateStatus(t('statusBegin'));
 
 function applyWebPreviewEnabled(enabled) {
 	if (!containerEl) return;
@@ -561,12 +885,15 @@ function applyWebPreviewEnabled(enabled) {
 	containerEl.classList.toggle('preview-disabled', !on);
 	if (!on) {
 		togglePlaceholder(true);
-		updateStatus('Scan or paste a portal link to begin');
+		updateStatus(t('statusBegin'));
 	} else {
-		updateStatus('Enter a URL and click Load to preview');
+		updateStatus(t('statusEnterUrl'));
 	}
 	if (adminPreviewToggle) {
-		adminPreviewToggle.checked = on;
+		adminPreviewToggle.checked = !on;
+	}
+	if (settingsPreviewToggle) {
+		settingsPreviewToggle.checked = on;
 	}
 }
 
@@ -597,7 +924,7 @@ async function syncAdminPreviewToggle() {
 	try {
 		if (window.electronAPI && typeof window.electronAPI.webPreviewGetEnabled === 'function') {
 			const res = await window.electronAPI.webPreviewGetEnabled();
-			if (res && res.ok) adminPreviewToggle.checked = Boolean(res.enabled);
+			if (res && res.ok) adminPreviewToggle.checked = !Boolean(res.enabled);
 		}
 	} catch { }
 }
@@ -606,7 +933,7 @@ if (adminPreviewToggle) {
 	adminPreviewToggle.addEventListener('change', async () => {
 		try {
 			if (window.electronAPI && typeof window.electronAPI.webPreviewSetEnabled === 'function') {
-				await window.electronAPI.webPreviewSetEnabled(adminPreviewToggle.checked);
+				await window.electronAPI.webPreviewSetEnabled(!adminPreviewToggle.checked);
 			}
 		} catch {
 			updateStatus('Failed to change web preview setting', true);
@@ -630,7 +957,10 @@ function resumePreviewIfIdle() {
 		isOverlayOpen(qrModal) ||
 		isOverlayOpen(assignStudyModal) ||
 		isOverlayOpen(assignMwlTagsModal) ||
-		isOverlayOpen(operationSuccessModal)
+		isOverlayOpen(jivexPasswordModal) ||
+		isOverlayOpen(operationSuccessModal) ||
+		isOverlayOpen(languageModal) ||
+		isOverlayOpen(settingsModal)
 	) {
 		return;
 	}
@@ -699,7 +1029,7 @@ function askAdminAuth(mode) {
 			const onEye = () => {
 				const isHidden = input.type === 'password';
 				input.type = isHidden ? 'text' : 'password';
-				btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+				btn.setAttribute('aria-label', isHidden ? t('hidePassword') : t('showPassword'));
 				btn.innerHTML = isHidden ? eyeOffSvg : eyeSvg;
 				try { input.focus(); } catch { }
 			};
@@ -731,7 +1061,7 @@ function askAdminAuth(mode) {
 					<path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
 				</svg>
 			`;
-			authCurrentEye.setAttribute('aria-label', 'Show password');
+			authCurrentEye.setAttribute('aria-label', t('showPassword'));
 		}
 		if (authNewEye) {
 			authNewEye.innerHTML = `
@@ -740,34 +1070,40 @@ function askAdminAuth(mode) {
 					<path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
 				</svg>
 			`;
-			authNewEye.setAttribute('aria-label', 'Show password');
+			authNewEye.setAttribute('aria-label', t('showPassword'));
 		}
+		const authTitleEl = document.getElementById('auth-title');
 		if (mode === 'set') {
-			document.getElementById('auth-title').textContent = 'Set Admin Password';
+			if (authTitleEl) authTitleEl.textContent = t('setAdminPassword');
 			authCurrentWrap.style.display = 'none';
 			authNewWrap.style.display = '';
-			authOk.textContent = 'Save';
+			authOk.textContent = t('save');
 			openModal(authModal);
 			unbindNewEye = bindEye(authNewEye, authNewInput);
 			setTimeout(() => authNewInput.focus(), 0);
 		} else if (mode === 'verify') {
-			document.getElementById('auth-title').textContent = 'Admin Login';
+			if (authTitleEl) authTitleEl.textContent = t('adminLogin');
 			authCurrentWrap.style.display = '';
 			authNewWrap.style.display = 'none';
-			authOk.textContent = 'Continue';
+			authOk.textContent = t('continue');
 			openModal(authModal);
 			unbindCurrentEye = bindEye(authCurrentEye, authCurrentInput);
 			setTimeout(() => authCurrentInput.focus(), 0);
 		} else {
-			document.getElementById('auth-title').textContent = 'Change Admin Password';
+			if (authTitleEl) authTitleEl.textContent = t('changeAdminPassword');
 			authCurrentWrap.style.display = '';
 			authNewWrap.style.display = '';
-			authOk.textContent = 'Change';
+			authOk.textContent = t('change');
 			openModal(authModal);
 			unbindCurrentEye = bindEye(authCurrentEye, authCurrentInput);
 			unbindNewEye = bindEye(authNewEye, authNewInput);
 			setTimeout(() => authCurrentInput.focus(), 0);
 		}
+
+		authModal.querySelectorAll('[data-i18n]').forEach((el) => {
+			const key = el.getAttribute('data-i18n');
+			if (key && el !== authTitleEl && el !== authOk) el.textContent = t(key);
+		});
 
 		// Wire events
 		authCancel.addEventListener('click', onCancel);
@@ -939,11 +1275,11 @@ function closeOperationSuccessPopup() {
 }
 
 function showLoadSuccessPopup() {
-	showOperationSuccessPopup({ title: 'Study loaded' });
+	showOperationSuccessPopup({ title: t('loadSuccessTitle') });
 }
 
 function showAssignSuccessPopup() {
-	showOperationSuccessPopup({ title: 'Study assigned' });
+	showOperationSuccessPopup({ title: t('studyAssigned') });
 }
 
 function showPacsSuccessPopup({ filesSent = 0, patientName = '' } = {}) {
@@ -964,7 +1300,6 @@ function resetImportUi() {
 	importInProgress = false;
 	importAborted = false;
 	if (addToPacsBtn) addToPacsBtn.disabled = false;
-	if (importCancelBtn) importCancelBtn.disabled = false;
 	if (loadBtn) loadBtn.disabled = false;
 	if (eyeBtn) eyeBtn.disabled = false;
 	showImportProgressBar();
@@ -994,9 +1329,9 @@ function formatPatientDob(raw) {
 
 function formatPatientGender(raw) {
 	const s = String(raw || '').trim().toUpperCase();
-	if (s === 'M') return 'Male';
-	if (s === 'F') return 'Female';
-	if (s === 'O') return 'Other';
+	if (s === 'M') return t('male');
+	if (s === 'F') return t('female');
+	if (s === 'O') return t('other');
 	return String(raw || '').trim();
 }
 
@@ -1005,7 +1340,7 @@ function clearPatientMetadata() {
 	hdscLoadedStudyUid = null;
 	for (const { el } of META_FIELDS) {
 		if (!el) continue;
-		el.textContent = 'Not available';
+		el.textContent = t('notAvailable');
 		el.classList.add('meta-missing');
 	}
 }
@@ -1029,10 +1364,10 @@ function renderPatientMetadata(metadata, availability) {
 		const has = availability?.[key] ?? Boolean(raw && String(raw).trim());
 		if (has && raw) {
 			const display = format ? format(raw) : String(raw).trim();
-			el.textContent = display || 'Not available';
+			el.textContent = display || t('notAvailable');
 			el.classList.toggle('meta-missing', !display);
 		} else {
-			el.textContent = 'Not available';
+			el.textContent = t('notAvailable');
 			el.classList.add('meta-missing');
 		}
 	}
@@ -1477,7 +1812,7 @@ async function confirmAssignMwlSelection() {
 	closeAssignStudyModal();
 	assignStudyInProgress = true;
 	setAssignStudyAnimating(true);
-	updateStatus('Assigning study…');
+	updateStatus(t('assigningStudy'));
 
 	try {
 		let tags = [];
@@ -1492,7 +1827,7 @@ async function confirmAssignMwlSelection() {
 		storeAssignedStudyMetadata(study, tags);
 		applyMwlStudyToPatientCard(study, tags);
 		await sleep(3000);
-		updateStatus('Study assigned');
+		updateStatus(t('studyAssigned'));
 		scrollPatientCardIntoView();
 		showAssignSuccessPopup();
 	} catch (e) {
@@ -1678,18 +2013,6 @@ if (assignStudyModal) {
 }
 if (addToPacsBtn) {
 	addToPacsBtn.addEventListener('click', handleAddToPacs);
-}
-if (importCancelBtn) {
-	importCancelBtn.addEventListener('click', () => {
-		if (importInProgress) {
-			importAborted = true;
-			resetImportUi();
-			updateStatus('Import cancelled');
-		} else {
-			resetImportUi();
-			clearPatientMetadata();
-		}
-	});
 }
 if (operationSuccessOk) {
 	operationSuccessOk.addEventListener('click', closeOperationSuccessPopup);
@@ -2049,4 +2372,46 @@ if (sendSubmit) {
 		const ok = await sendDicom({ aeTitle: ae, port, ip });
 		if (ok) closeSendModal();
 	});
+}
+
+if (languageEnglish) languageEnglish.addEventListener('click', () => selectLanguage('en'));
+if (languageGerman) languageGerman.addEventListener('click', () => selectLanguage('de'));
+if (languageCancel) languageCancel.addEventListener('click', closeLanguageModal);
+if (languageModal) {
+	languageModal.addEventListener('click', (e) => {
+		if (e.target === languageModal) closeLanguageModal();
+	});
+}
+if (window.electronAPI?.onOpenLanguageModal) {
+	window.electronAPI.onOpenLanguageModal(() => openLanguageModal());
+}
+
+if (settingsBtn) settingsBtn.addEventListener('click', openSettingsModal);
+if (settingsClose) settingsClose.addEventListener('click', closeSettingsModal);
+if (settingsModal) {
+	settingsModal.addEventListener('click', (e) => {
+		if (e.target === settingsModal) closeSettingsModal();
+	});
+}
+if (settingsAdminPanel) settingsAdminPanel.addEventListener('click', () => { openAdminFromSettings(); });
+if (settingsChangeLanguage) settingsChangeLanguage.addEventListener('click', openLanguageFromSettings);
+if (settingsPreviewToggle) {
+	settingsPreviewToggle.addEventListener('change', async () => {
+		const wantEnabled = settingsPreviewToggle.checked;
+		try {
+			if (window.electronAPI?.webPreviewSetEnabled) {
+				await window.electronAPI.webPreviewSetEnabled(wantEnabled);
+			}
+			if (isOverlayOpen(settingsModal) && window.electronAPI?.previewSuspend) {
+				await window.electronAPI.previewSuspend();
+			}
+		} catch {
+			updateStatus('Failed to change web preview setting', true);
+			settingsPreviewToggle.checked = !wantEnabled;
+		}
+	});
+	settingsPreviewToggle.addEventListener('click', (e) => e.stopPropagation());
+}
+if (window.electronAPI?.onOpenSettingsModal) {
+	window.electronAPI.onOpenSettingsModal(() => openSettingsModal());
 }

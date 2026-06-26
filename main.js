@@ -1,4 +1,4 @@
-import { app, BrowserWindow, BrowserView, clipboard, dialog, ipcMain, Menu, nativeImage, screen, shell } from 'electron';
+import { app, BrowserWindow, BrowserView, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, shell } from 'electron';
 import crypto from 'crypto';
 import { exec, execFile } from 'child_process';
 import fs from 'fs';
@@ -15,12 +15,15 @@ import { queryMwlWorklist } from './lib/findscu-mwl.js';
 import { applyAssignedMetadataToDicomFiles } from './lib/dicom-modify.js';
 import { downloadHdscStudyFromPreview, injectHdscSavePickerHook, isHdscPortalUrl } from './lib/hdsc-download.js';
 import { downloadGoogleDriveToFile, resolveHdscFallbackDownload, resolvePortalFallbackDownload } from './lib/hdsc-fallback-sources.js';
+import { downloadJivexStudyWithSeleniumInPreview } from './lib/jivex-selenium.js';
+import { isJivexPortalUrl } from './lib/jivex-download.js';
 
 // Keep hidden pages at full speed (match Chrome/Edge — no background throttling)
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('remote-debugging-port', '9222');
 
 const DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 const CHROME_USER_AGENT =
@@ -40,8 +43,30 @@ let previewView = null;
 let hdscView = null;
 let hdscViewIsVisible = false;
 let overlaySuspended = false;
+let hidePreviewForAutomation = false;
 let webPreviewEnabled = false;
-let webPreviewMenuItem = null;
+let appLanguage = 'en';
+
+function getLanguageFilePath() {
+    return path.join(app.getPath('userData'), 'app-language.json');
+}
+
+function loadAppLanguage() {
+    try {
+        const raw = fs.readFileSync(getLanguageFilePath(), 'utf8');
+        const data = JSON.parse(raw);
+        if (data?.lang === 'de' || data?.lang === 'en') appLanguage = data.lang;
+    } catch { /* default en */ }
+}
+
+function saveAppLanguage(lang) {
+    appLanguage = lang === 'de' ? 'de' : 'en';
+    try {
+        fs.writeFileSync(getLanguageFilePath(), JSON.stringify({ lang: appLanguage }), 'utf8');
+    } catch (e) {
+        console.error('Failed to save app language', e);
+    }
+}
 let lastDownloadedZipPath = null;
 let lastDownloadedStudyUid = null;
 /** Full MWL rows (with tags) — kept in main process to avoid huge IPC payloads */
@@ -200,10 +225,14 @@ async function createWindow() {
     // Ensure window becomes visible even if ready-to-show doesn't fire
     try { mainWindow.show(); } catch { }
 
-    // Handle window resize
+    // Handle window resize / fullscreen
     mainWindow.on('resize', () => {
         resizePreview();
     });
+    mainWindow.on('enter-full-screen', () => resizePreview());
+    mainWindow.on('leave-full-screen', () => resizePreview());
+    mainWindow.on('maximize', () => resizePreview());
+    mainWindow.on('unmaximize', () => resizePreview());
 
     // When alt-tabbing back, ensure BrowserView doesn't steal clicks over modals
     mainWindow.on('focus', () => {
@@ -212,53 +241,44 @@ async function createWindow() {
     });
 }
 
-function setAppMenu() {
-    const template = [
-        {
-            label: 'File',
-            submenu: [
-                {
-                    label: 'Admin Panel',
-                    accelerator: 'Ctrl+Shift+A',
-                    click: async () => {
-                        try {
-                            if (!mainWindow) return;
-                            // Ask renderer to open admin (more reliable than DOM click injection)
-                            mainWindow.webContents.send('open-admin-panel');
-                        } catch (e) {
-                            console.error('Failed to open admin panel from menu', e);
-                        }
-                    }
-                },
-                (webPreviewMenuItem = {
-                    label: 'Enable Web Preview',
-                    type: 'checkbox',
-                    checked: webPreviewEnabled,
-                    click: (menuItem) => {
-                        try {
-                            setWebPreviewEnabled(Boolean(menuItem.checked));
-                        } catch (e) {
-                            console.error('Failed to toggle web preview', e);
-                        }
-                    }
-                }),
-                { type: 'separator' },
-                { label: 'Reload', role: 'reload' },
-                { label: 'Force Reload', role: 'forceReload' },
-                { type: 'separator' },
-                { label: 'Actual Size', role: 'resetZoom' },
-                { label: 'Zoom In', role: 'zoomIn' },
-                { label: 'Zoom Out', role: 'zoomOut' },
-                { type: 'separator' },
-                { label: 'Toggle Full Screen', role: 'togglefullscreen' },
-                { label: 'Toggle Developer Tools', role: 'toggleDevTools' },
-                { type: 'separator' },
-                { label: 'Exit', role: 'quit' }
-            ]
+function openAppDevTools() {
+    if (!mainWindow?.webContents || mainWindow.webContents.isDestroyed()) return;
+    if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+        return;
+    }
+    mainWindow.webContents.openDevTools({ mode: 'detach', activate: true });
+}
+
+function openPreviewDevTools() {
+    const wc = previewView?.webContents;
+    if (!wc || wc.isDestroyed()) return;
+    if (wc.isDevToolsOpened()) {
+        wc.closeDevTools();
+        return;
+    }
+    wc.openDevTools({ mode: 'detach', activate: true });
+}
+
+function registerAppShortcuts() {
+    try {
+        globalShortcut.unregister('CommandOrControl+Shift+A');
+        globalShortcut.register('CommandOrControl+Shift+A', () => {
+            if (!mainWindow?.webContents || mainWindow.webContents.isDestroyed()) return;
+            mainWindow.webContents.send('open-admin-panel');
+        });
+    } catch (e) {
+        console.error('Failed to register app shortcuts', e);
+    }
+}
+
+function hideNativeMenuBar() {
+    try {
+        Menu.setApplicationMenu(null);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.setMenuBarVisibility(false);
         }
-    ];
-    const menu = Menu.buildFromTemplate(template);
-    Menu.setApplicationMenu(menu);
+    } catch { /* ignore */ }
 }
 
 function createPreviewView() {
@@ -276,6 +296,7 @@ function createPreviewView() {
     });
 
     mainWindow.setBrowserView(previewView);
+    configureWebContentsForSpeed(previewView.webContents);
     previewView.webContents.setZoomFactor(PREVIEW_ZOOM_FACTOR);
     resizePreview();
 }
@@ -284,12 +305,7 @@ function setWebPreviewEnabled(enabled) {
     const wasEnabled = webPreviewEnabled;
     webPreviewEnabled = Boolean(enabled);
 
-    if (webPreviewMenuItem) {
-        webPreviewMenuItem.checked = webPreviewEnabled;
-    }
-
     if (!webPreviewEnabled) {
-        overlaySuspended = true;
         hdscViewIsVisible = false;
         if (hdscView && mainWindow) {
             try { mainWindow.setBrowserView(null); } catch { }
@@ -299,7 +315,6 @@ function setWebPreviewEnabled(enabled) {
     if (!mainWindow) return;
 
     if (webPreviewEnabled) {
-        overlaySuspended = false;
         if (!wasEnabled) {
             try {
                 const b = mainWindow.getBounds();
@@ -309,8 +324,8 @@ function setWebPreviewEnabled(enabled) {
         if (!previewView) createPreviewView();
         else {
             try { mainWindow.setBrowserView(previewView); } catch { }
-            resizePreview();
         }
+        resizePreview();
     } else {
         try { mainWindow.setBrowserView(null); } catch { }
         if (previewView) {
@@ -368,12 +383,19 @@ function getOrCreateHdscView() {
     return hdscView;
 }
 
-function getHdscVisibleBounds() {
+function getLayoutMetrics() {
     const bounds = mainWindow.getContentBounds();
+    const layoutWidth = Math.min(bounds.width, DEFAULT_WINDOW_WIDTH);
+    const layoutX = Math.max(0, Math.floor((bounds.width - layoutWidth) / 2));
+    return { bounds, layoutWidth, layoutX };
+}
+
+function getHdscVisibleBounds() {
+    const { bounds, layoutWidth, layoutX } = getLayoutMetrics();
     return {
-        x: LEFT_PANEL_WIDTH,
+        x: layoutX + LEFT_PANEL_WIDTH,
         y: 0,
-        width: Math.max(400, bounds.width - LEFT_PANEL_WIDTH),
+        width: Math.max(400, layoutWidth - LEFT_PANEL_WIDTH),
         height: bounds.height,
     };
 }
@@ -410,6 +432,10 @@ function detachHdscView() {
 
 function resizePreview() {
     if (!mainWindow) return;
+    if (hidePreviewForAutomation) {
+        suspendPreviewBounds();
+        return;
+    }
     if (hdscViewIsVisible && hdscView?.webContents && !hdscView.webContents.isDestroyed()) {
         hdscView.setBounds(getHdscVisibleBounds());
         return;
@@ -424,13 +450,59 @@ function resizePreview() {
         return;
     }
 
-    const bounds = mainWindow.getContentBounds();
+    const { bounds, layoutWidth, layoutX } = getLayoutMetrics();
     previewView.setBounds({
-        x: LEFT_PANEL_WIDTH,
+        x: layoutX + LEFT_PANEL_WIDTH,
         y: 0,
-        width: bounds.width - LEFT_PANEL_WIDTH,
+        width: Math.max(0, layoutWidth - LEFT_PANEL_WIDTH),
         height: bounds.height
     });
+}
+
+function ensurePreviewViewForAutomation() {
+    if (!mainWindow) return null;
+    hidePreviewForAutomation = true;
+    if (!previewView || previewView.webContents?.isDestroyed()) {
+        previewView = new BrowserView({
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                webSecurity: false,
+                backgroundThrottling: false,
+            },
+        });
+        previewView.webContents.setZoomFactor(PREVIEW_ZOOM_FACTOR);
+    }
+    configureWebContentsForSpeed(previewView.webContents);
+    try { mainWindow.setBrowserView(previewView); } catch { }
+    suspendPreviewBounds();
+    try {
+        mainWindow.webContents.executeJavaScript('document.activeElement?.blur?.()');
+    } catch { /* ignore */ }
+    try { previewView.webContents.focus(); } catch { }
+    return previewView;
+}
+
+function stopPreviewWebContents() {
+    const wc = previewView?.webContents;
+    if (!wc || wc.isDestroyed()) return;
+    try { wc.stop(); } catch { /* ignore */ }
+    try { wc.loadURL('about:blank'); } catch { /* ignore */ }
+}
+
+function releaseAutomationPreviewView() {
+    if (!mainWindow) return;
+    hidePreviewForAutomation = false;
+    stopPreviewWebContents();
+    if (!webPreviewEnabled) {
+        try { mainWindow.setBrowserView(null); } catch { }
+        if (previewView) suspendPreviewBounds();
+    } else {
+        try { mainWindow.setBrowserView(previewView); } catch { }
+        overlaySuspended = false;
+        resizePreview();
+    }
+    try { mainWindow.webContents.focus(); } catch { }
 }
 
 function loadWebsite(url) {
@@ -460,6 +532,15 @@ ipcMain.handle('load-website', async (event, url) => {
     if (!webPreviewEnabled) return { success: false, error: 'Web preview is disabled' };
     loadWebsite(url);
     return { success: true };
+});
+
+ipcMain.handle('app-language-get', async () => {
+    return { ok: true, lang: appLanguage };
+});
+
+ipcMain.handle('app-language-set', async (_event, lang) => {
+    saveAppLanguage(lang);
+    return { ok: true, lang: appLanguage };
 });
 
 ipcMain.handle('web-preview-get-enabled', async () => {
@@ -686,6 +767,76 @@ async function downloadMappedPortalZip(event, fallback, logLabel = 'Portal') {
     };
 }
 
+let jivexDownloadInProgress = false;
+
+ipcMain.handle('jivex-download-study', async (_event, params) => {
+    if (jivexDownloadInProgress) {
+        return { ok: false, error: 'A Jivex download is already in progress — please wait' };
+    }
+    jivexDownloadInProgress = true;
+    try {
+        const portalUrl = String(params?.portalUrl || '').trim();
+        const password = String(params?.password || '');
+        const user = String(params?.user || '').trim();
+
+        if (!portalUrl || !isJivexPortalUrl(portalUrl)) {
+            return { ok: false, error: 'Not a valid Jivex portal link' };
+        }
+        if (!password) {
+            return { ok: false, error: 'Portal password is required' };
+        }
+
+        const preview = ensurePreviewViewForAutomation();
+        if (!preview) {
+            return { ok: false, error: 'Web preview is not available' };
+        }
+
+        const downloadsDir = app.getPath('downloads');
+        console.log('[JiveX] Automating Jivex download in background (preview hidden)…');
+        const emitBrowserDownload = (payload) => {
+            try {
+                mainWindow?.webContents?.send('browser-download-progress', payload);
+            } catch { /* ignore */ }
+        };
+        const result = await downloadJivexStudyWithSeleniumInPreview(preview, portalUrl, {
+            password,
+            user,
+            downloadsDir,
+            onDownloadProgress: emitBrowserDownload,
+        });
+
+        lastDownloadedZipPath = result.path;
+        if (result.studyUid) lastDownloadedStudyUid = result.studyUid;
+
+        const metaResult = await readMetadataFromZip(result.path);
+        console.log('[JiveX] Metadata read', {
+            ok: metaResult.ok,
+            patient: metaResult.metadata?.patientName || null,
+            path: result.path,
+        });
+        if (!metaResult.ok) {
+            return {
+                ok: false,
+                error: metaResult.reason || 'Download finished but DICOM metadata could not be read (ZIP may be incomplete)',
+                path: result.path,
+            };
+        }
+        return {
+            ok: true,
+            path: result.path,
+            studyUid: result.studyUid || null,
+            metadata: metaResult.ok ? metaResult.metadata : null,
+            metadataAvailability: metaResult.ok ? metaResult.availability : null,
+            metadataWarnings: metaResult.warnings || (metaResult.ok ? [] : [metaResult.reason]),
+        };
+    } catch (e) {
+        return { ok: false, error: e?.message || 'Jivex download failed' };
+    } finally {
+        releaseAutomationPreviewView();
+        jivexDownloadInProgress = false;
+    }
+});
+
 ipcMain.handle('portal-fallback-download', async (event, portalUrl) => {
     try {
         const url = String(portalUrl || '').trim();
@@ -694,8 +845,8 @@ ipcMain.handle('portal-fallback-download', async (event, portalUrl) => {
         const fallback = resolvePortalFallbackDownload(url);
         if (!fallback) return { ok: false, noFallback: true };
 
-        // HDSC mapped links use hdsc-download-study (browser automation fallback path)
-        if (isHdscPortalUrl(url)) return { ok: false, noFallback: true };
+        // HDSC and Jivex use dedicated download handlers
+        if (isHdscPortalUrl(url) || isJivexPortalUrl(url)) return { ok: false, noFallback: true };
 
         return await downloadMappedPortalZip(event, fallback, 'Portal');
     } catch (e) {
@@ -1009,6 +1160,7 @@ ipcMain.handle('preview-suspend', () => {
 
 ipcMain.handle('preview-resume', () => {
     if (!mainWindow || !previewView) return { ok: false };
+    if (!webPreviewEnabled) return { ok: true };
     overlaySuspended = false;
     resizePreview();
     return { ok: true };
@@ -1238,16 +1390,22 @@ ipcMain.handle('trigger-eye', async () => {
 });
 
 app.whenReady().then(async () => {
+    loadAppLanguage();
     try { app.setName('Cognizance Health'); } catch { }
     // Helps Windows pick up the correct taskbar icon/app identity
     try { app.setAppUserModelId('com.web-previewer.app'); } catch { }
-    setAppMenu();
+    registerAppShortcuts();
     await createWindow();
+    hideNativeMenuBar();
     setWebPreviewEnabled(false);
 
     app.on('activate', function () {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
+});
+
+app.on('will-quit', () => {
+    try { globalShortcut.unregisterAll(); } catch { /* ignore */ }
 });
 
 app.on('window-all-closed', function () {

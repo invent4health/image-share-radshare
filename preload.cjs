@@ -6,12 +6,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	downloadZip: (url, options) => ipcRenderer.invoke('download-zip', url, options),
 	hdscDownloadStudy: (portalUrl) => ipcRenderer.invoke('hdsc-download-study', portalUrl),
 	downloadPortalFallbackStudy: (portalUrl) => ipcRenderer.invoke('portal-fallback-download', portalUrl),
+	jivexDownloadStudy: (params) => ipcRenderer.invoke('jivex-download-study', params),
 	getDownloadedStudy: (studyUid) => ipcRenderer.invoke('get-downloaded-study', studyUid),
 	onDownloadProgress: (handler) => {
 		if (typeof handler !== 'function') return () => {};
 		const listener = (_event, payload) => handler(payload);
 		ipcRenderer.on('download-progress', listener);
 		return () => ipcRenderer.removeListener('download-progress', listener);
+	},
+	onBrowserDownloadProgress: (handler) => {
+		if (typeof handler !== 'function') return () => {};
+		const listener = (_event, payload) => handler(payload);
+		ipcRenderer.on('browser-download-progress', listener);
+		return () => ipcRenderer.removeListener('browser-download-progress', listener);
 	},
 	getDicomMetadataFromZip: (zipPath) => ipcRenderer.invoke('dicom-metadata-from-zip', zipPath),
 	copyToClipboard: (text) => ipcRenderer.invoke('clipboard-copy', text),
@@ -39,6 +46,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
 		if (typeof handler !== 'function') return;
 		ipcRenderer.on('open-admin-panel', () => handler());
 	},
+	onOpenLanguageModal: (handler) => {
+		if (typeof handler !== 'function') return;
+		ipcRenderer.on('open-language-modal', () => handler());
+	},
+	onOpenSettingsModal: (handler) => {
+		if (typeof handler !== 'function') return;
+		ipcRenderer.on('open-settings-modal', () => handler());
+	},
+	getAppLanguage: () => ipcRenderer.invoke('app-language-get'),
+	setAppLanguage: (lang) => ipcRenderer.invoke('app-language-set', lang),
 	onWebPreviewEnabledChanged: (handler) => {
 		if (typeof handler !== 'function') return;
 		ipcRenderer.on('web-preview-enabled-changed', (_evt, payload) => handler(payload));

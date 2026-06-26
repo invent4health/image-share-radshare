@@ -8,6 +8,7 @@
     "start": "electron .",
     "dev": "cross-env NODE_ENV=development electronmon .",
     "playwright-install": "playwright install chromium",
+    "selenium-setup": "python -m pip install -r requirements-selenium.txt || py -3 -m pip install -r requirements-selenium.txt",
     "build": "electron-builder --win",
     "build:portable": "electron-builder --win portable",
     "dist": "npm run build"
