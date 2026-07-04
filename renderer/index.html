@@ -1266,6 +1266,7 @@
       #auth-modal .modal,
       #admin-modal .modal,
       #language-modal .modal,
+      #license-modal .modal,
       #jivex-password-modal .modal,
       #assign-study-settings-modal .modal,
       #send-settings-modal .modal {
@@ -1308,6 +1309,47 @@
       #language-modal .modal-footer .button {
         width: auto;
         min-width: 140px;
+      }
+
+      #license-modal.modal-overlay {
+        z-index: 1300;
+      }
+
+      body.license-blocked .container {
+        pointer-events: none;
+        user-select: none;
+        opacity: 0.45;
+        filter: grayscale(0.15);
+      }
+
+      body.license-blocked #license-modal.modal-overlay {
+        pointer-events: auto;
+        opacity: 1;
+        filter: none;
+      }
+
+      #license-modal .modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding-top: 4px;
+      }
+
+      #license-modal .license-error {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #c62828;
+        min-height: 1.4em;
+      }
+
+      #license-modal .license-error:empty {
+        display: none;
+      }
+
+      #license-key-input {
+        letter-spacing: 0.06em;
+        font-family: Consolas, 'Courier New', monospace;
       }
 
       .language-options {
@@ -1412,6 +1454,20 @@
         font-size: 11px;
         font-weight: 500;
         color: #7a8a85;
+      }
+
+      .settings-license-footer {
+        margin: 0 20px 16px;
+        padding-top: 12px;
+        border-top: 1px solid #e3ebe7;
+        text-align: center;
+        font-size: 12px;
+        color: #5a6b66;
+        line-height: 1.4;
+      }
+
+      .settings-license-footer[hidden] {
+        display: none;
       }
 
       .settings-menu-toggle {
@@ -1538,7 +1594,7 @@
           </section>
 
           <section class="menu-step import-step">
-            <h2 class="step-title" id="import-step-title" data-i18n="step3Title">Step 3: Import in progress…</h2>
+            <h2 class="step-title" id="import-step-title" data-i18n="step3Title">Step 3: Study import…</h2>
             <div id="import-progress-wrap">
               <div class="progress-track" aria-hidden="true">
                 <div class="progress-fill" id="import-progress-fill"></div>
@@ -2168,6 +2224,40 @@
               <input id="settings-preview-toggle" type="checkbox" />
             </label>
           </div>
+        </div>
+        <p id="settings-license-status" class="settings-license-footer" hidden></p>
+      </div>
+    </div>
+
+    <!-- License activation -->
+    <div class="modal-overlay" id="license-modal">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="license-modal-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="license-modal-title" data-i18n="licenseTitle">License activation</div>
+        </div>
+        <div class="modal-body">
+          <p class="modal-hint" id="license-prompt" data-i18n="licensePrompt">Enter your 16-digit license key to continue.</p>
+          <div class="form-field">
+            <label for="license-key-input" data-i18n="licenseKey">License key</label>
+            <input
+              id="license-key-input"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              maxlength="19"
+              placeholder="XXXX-XXXX-XXXX-XXXX"
+              data-i18n-placeholder="licenseKeyPlaceholder"
+            />
+          </div>
+          <p id="license-error" class="license-error" aria-live="polite"></p>
+        </div>
+        <div class="modal-footer">
+          <button id="license-activate-btn" type="button" class="button" data-i18n="licenseActivate">Activate</button>
         </div>
       </div>
     </div>

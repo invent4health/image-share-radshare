@@ -17,6 +17,11 @@ import { downloadHdscStudyFromPreview, injectHdscSavePickerHook, isHdscPortalUrl
 import { downloadGoogleDriveToFile, resolveHdscFallbackDownload, resolvePortalFallbackDownload } from './lib/hdsc-fallback-sources.js';
 import { downloadJivexStudyWithSeleniumInPreview } from './lib/jivex-selenium.js';
 import { isJivexPortalUrl } from './lib/jivex-download.js';
+import {
+    daysSinceEpoch,
+    normalizeLicenseKey,
+    validateLicenseKey,
+} from './lib/license-crypto.js';
 
 // Keep hidden pages at full speed (match Chrome/Edge — no background throttling)
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
@@ -66,6 +71,327 @@ function saveAppLanguage(lang) {
     } catch (e) {
         console.error('Failed to save app language', e);
     }
+}
+
+/** Set COGNIZANCE_LICENSE_SECRET in production. Set COGNIZANCE_SKIP_LICENSE=1 to bypass. */
+
+function getLicenseFilePath() {
+    return path.join(app.getPath('userData'), 'license.json');
+}
+
+function isLicenseRequired() {
+    if (process.env.COGNIZANCE_SKIP_LICENSE === '1') return false;
+    return true;
+}
+
+const VIRTUAL_MAC_OUIS = new Set([
+    '005056', // VMware
+    '000C29', // VMware
+    '001C14', // VMware
+    '000569', // VMware
+    '080027', // VirtualBox
+    '00155D', // Hyper-V
+    '525400', // QEMU/KVM
+    '00163E', // Xen
+]);
+
+const VIRTUAL_IFACE_PATTERNS = /vmware|virtualbox|vbox|vethernet|hyper-v|virtual|loopback|wsl|docker|npcap|bluetooth|vpn|tap-/i;
+
+function isVirtualMac(mac) {
+    const hex = String(mac || '').replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+    if (hex.length !== 12) return true;
+    if (hex === '000000000000') return true;
+    return VIRTUAL_MAC_OUIS.has(hex.slice(0, 6));
+}
+
+function isVirtualInterfaceName(name) {
+    return VIRTUAL_IFACE_PATTERNS.test(String(name || ''));
+}
+
+function collectPhysicalNetworkCandidates() {
+    const nets = os.networkInterfaces();
+    const candidates = [];
+    for (const name of Object.keys(nets)) {
+        if (isVirtualInterfaceName(name)) continue;
+        for (const net of nets[name] || []) {
+            if (!net?.mac || net.internal || net.mac === '00:00:00:00:00:00') continue;
+            if (isVirtualMac(net.mac)) continue;
+            const family = net.family;
+            const isIpv4 = family === 'IPv4' || family === 4;
+            const hasIpv4 = isIpv4 && net.address && !net.address.startsWith('169.254.');
+            candidates.push({ mac: net.mac, name, hasIpv4 });
+        }
+    }
+    return candidates;
+}
+
+function getAllMachineMacAddresses() {
+    const seen = new Set();
+    const macs = [];
+    const sorted = collectPhysicalNetworkCandidates().sort((a, b) => {
+        if (a.hasIpv4 !== b.hasIpv4) return Number(b.hasIpv4) - Number(a.hasIpv4);
+        return a.name.localeCompare(b.name);
+    });
+    for (const candidate of sorted) {
+        const key = candidate.mac.toUpperCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        macs.push(candidate.mac);
+    }
+    return macs;
+}
+
+function getMachineMacAddress() {
+    return getAllMachineMacAddresses()[0] || null;
+}
+
+function validateLicenseForMachine(rawKey) {
+    const macs = getAllMachineMacAddresses();
+    if (!macs.length) {
+        return { ...validateLicenseKey(rawKey, ''), macAddress: null };
+    }
+    for (const mac of macs) {
+        const result = validateLicenseKey(rawKey, mac);
+        if (result.valid) {
+            return { ...result, macAddress: mac };
+        }
+    }
+    return { valid: false, reason: 'invalid_key', macAddress: getMachineMacAddress() };
+}
+
+function readLicenseRecord() {
+    try {
+        const raw = fs.readFileSync(getLicenseFilePath(), 'utf8');
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+}
+
+function writeLicenseRecord(record) {
+    fs.writeFileSync(getLicenseFilePath(), JSON.stringify(record, null, 2), 'utf8');
+}
+
+function isClockRollback(lastSeenDay, today = daysSinceEpoch()) {
+    const seen = Number(lastSeenDay);
+    return Number.isFinite(seen) && today < seen;
+}
+
+function touchLastSeenDay(rec, today = daysSinceEpoch()) {
+    if (!rec?.key) return rec;
+    const prev = Number(rec.lastSeenDay);
+    const next = Number.isFinite(prev) ? Math.max(prev, today) : today;
+    if (next === prev) return rec;
+    const updated = { ...rec, lastSeenDay: next };
+    writeLicenseRecord(updated);
+    return updated;
+}
+
+function getLicenseExpiresAtMs(rec, result) {
+    if (rec?.expiresAt) {
+        const ms = Date.parse(rec.expiresAt);
+        if (Number.isFinite(ms)) return ms;
+    }
+    if (rec?.activatedAt && result?.expiryDay != null) {
+        const activatedMs = Date.parse(rec.activatedAt);
+        if (Number.isFinite(activatedMs)) {
+            const activationDay = daysSinceEpoch(new Date(activatedMs));
+            const daysValid = Math.max(1, result.expiryDay - activationDay);
+            return activatedMs + daysValid * 86400000;
+        }
+    }
+    return (result.expiryDay + 1) * 86400000;
+}
+
+function getLicenseTimeStatus(rec, result) {
+    const expiresAtMs = getLicenseExpiresAtMs(rec, result);
+    const msLeft = expiresAtMs - Date.now();
+    const expired = msLeft <= 0;
+    const hoursRemaining = expired ? 0 : Math.max(1, Math.ceil(msLeft / 3600000));
+    const daysRemaining = expired ? 0 : Math.max(1, Math.ceil(msLeft / 86400000));
+    return {
+        expired,
+        expiresAtMs,
+        msLeft,
+        hoursRemaining,
+        daysRemaining,
+        expiresAt: new Date(expiresAtMs).toISOString(),
+    };
+}
+
+function buildActivatedLicenseState(rec, result, mac) {
+    const timeStatus = getLicenseTimeStatus(rec, result);
+    if (timeStatus.expired) {
+        return {
+            activated: false,
+            expired: true,
+            daysRemaining: 0,
+            hoursRemaining: 0,
+            expiryDay: result.expiryDay,
+            expiryDate: result.expiryDate,
+            expiresAt: timeStatus.expiresAt,
+            macAddress: result.macAddress || mac,
+            macHex: result.macHex,
+        };
+    }
+
+    touchLastSeenDay(rec, daysSinceEpoch());
+
+    return {
+        activated: true,
+        expired: false,
+        daysRemaining: timeStatus.daysRemaining,
+        hoursRemaining: timeStatus.hoursRemaining,
+        expiryDay: result.expiryDay,
+        expiryDate: result.expiryDate,
+        expiresAt: timeStatus.expiresAt,
+        macAddress: result.macAddress || mac,
+        macHex: result.macHex,
+    };
+}
+
+function licenseGuardResponse() {
+    if (!isLicenseRequired()) return null;
+    const state = evaluateLicenseRecord();
+    if (state.activated && !state.expired && !state.clockTampered) return null;
+    if (state.clockTampered) {
+        return {
+            ok: false,
+            error: 'clock_tampered',
+            reason: 'System clock tampering detected',
+        };
+    }
+    return {
+        ok: false,
+        error: 'license_expired',
+        reason: 'License has expired',
+    };
+}
+
+function evaluateLicenseRecord(rec = readLicenseRecord()) {
+    if (!rec?.key) {
+        return {
+            activated: false,
+            expired: false,
+            daysRemaining: 0,
+            expiryDate: null,
+            macAddress: getMachineMacAddress(),
+        };
+    }
+
+    const mac = getMachineMacAddress();
+    const today = daysSinceEpoch();
+    const result = validateLicenseForMachine(rec.key);
+    if (!result.valid) {
+        return {
+            activated: false,
+            expired: Boolean(rec.expiryDay),
+            daysRemaining: 0,
+            expiryDate: rec.expiryDate || null,
+            macAddress: result.macAddress || mac,
+            invalid: true,
+        };
+    }
+
+    if (isClockRollback(rec.lastSeenDay, today)) {
+        return {
+            activated: false,
+            expired: true,
+            clockTampered: true,
+            daysRemaining: 0,
+            expiryDay: result.expiryDay,
+            expiryDate: result.expiryDate,
+            macAddress: result.macAddress || mac,
+            macHex: result.macHex,
+        };
+    }
+
+    if (result.expired) {
+        return {
+            activated: false,
+            expired: true,
+            daysRemaining: 0,
+            hoursRemaining: 0,
+            expiryDay: result.expiryDay,
+            expiryDate: result.expiryDate,
+            macAddress: result.macAddress || mac,
+            macHex: result.macHex,
+        };
+    }
+
+    return buildActivatedLicenseState(rec, result, mac);
+}
+
+function isLicenseActivated() {
+    if (!isLicenseRequired()) return true;
+    const state = evaluateLicenseRecord();
+    return state.activated;
+}
+
+function saveLicenseActivation(rawKey) {
+    const key = normalizeLicenseKey(rawKey);
+    if (!key) throw new Error('Invalid license key format');
+
+    const today = daysSinceEpoch();
+    const existing = readLicenseRecord();
+    const prevLastSeen = Number(existing?.lastSeenDay);
+    if (Number.isFinite(prevLastSeen) && today < prevLastSeen) {
+        throw new Error('System clock tampering detected');
+    }
+
+    const result = validateLicenseForMachine(key);
+    if (!result.valid) throw new Error('Invalid license key for this device');
+    if (result.expired) throw new Error('License key has expired');
+
+    const activationDay = daysSinceEpoch();
+    const daysValid = Math.max(1, result.expiryDay - activationDay);
+    const expiresAt = new Date(Date.now() + daysValid * 86400000).toISOString();
+
+    writeLicenseRecord({
+        key,
+        macHex: result.macHex,
+        expiryDay: result.expiryDay,
+        expiryDate: result.expiryDate,
+        activatedAt: new Date().toISOString(),
+        expiresAt,
+        daysValid,
+        lastSeenDay: Number.isFinite(prevLastSeen) ? Math.max(prevLastSeen, today) : today,
+    });
+}
+
+function getLicenseStatusPayload() {
+    const required = isLicenseRequired();
+    const macAddress = getMachineMacAddress();
+    if (!required) {
+        return { ok: true, required: false, activated: true, expired: false, daysRemaining: null, macAddress };
+    }
+
+    const rec = readLicenseRecord();
+    if (!rec?.key) {
+        return {
+            ok: true,
+            required: true,
+            activated: false,
+            expired: false,
+            daysRemaining: 0,
+            macAddress,
+        };
+    }
+
+    const state = evaluateLicenseRecord(rec);
+    return {
+        ok: true,
+        required: true,
+        activated: state.activated,
+        expired: Boolean(state.expired),
+        daysRemaining: state.daysRemaining,
+        hoursRemaining: state.hoursRemaining ?? null,
+        expiryDate: state.expiryDate || null,
+        expiresAt: state.expiresAt || null,
+        macAddress: state.macAddress || macAddress,
+        invalid: Boolean(state.invalid),
+        clockTampered: Boolean(state.clockTampered),
+    };
 }
 let lastDownloadedZipPath = null;
 let lastDownloadedStudyUid = null;
@@ -529,6 +855,8 @@ function loadWebsite(url) {
 
 // IPC handlers
 ipcMain.handle('load-website', async (event, url) => {
+    const licenseBlocked = licenseGuardResponse();
+    if (licenseBlocked) return { success: false, error: licenseBlocked.reason };
     if (!webPreviewEnabled) return { success: false, error: 'Web preview is disabled' };
     loadWebsite(url);
     return { success: true };
@@ -674,6 +1002,8 @@ ipcMain.handle('get-downloaded-study', async (_event, studyUid) => {
 });
 
 ipcMain.handle('download-zip', async (event, url, options = {}) => {
+    const licenseBlocked = licenseGuardResponse();
+    if (licenseBlocked) return licenseBlocked;
     try {
         const silent = Boolean(options?.silent);
         const u = new URL(String(url));
@@ -744,7 +1074,6 @@ async function downloadMappedPortalZip(event, fallback, logLabel = 'Portal') {
         outPath = path.join(downloadsDir, `${base}-${stamp}${ext}`);
     }
 
-    console.log(`[${logLabel}] Using mapped zip source:`, fallback.sourceUrl);
     const reportProgress = (data) => {
         try {
             event.sender.send('download-progress', data);
@@ -770,6 +1099,9 @@ async function downloadMappedPortalZip(event, fallback, logLabel = 'Portal') {
 let jivexDownloadInProgress = false;
 
 ipcMain.handle('jivex-download-study', async (_event, params) => {
+    const licenseBlocked = licenseGuardResponse();
+    if (licenseBlocked) return licenseBlocked;
+
     if (jivexDownloadInProgress) {
         return { ok: false, error: 'A Jivex download is already in progress — please wait' };
     }
@@ -838,6 +1170,8 @@ ipcMain.handle('jivex-download-study', async (_event, params) => {
 });
 
 ipcMain.handle('portal-fallback-download', async (event, portalUrl) => {
+    const licenseBlocked = licenseGuardResponse();
+    if (licenseBlocked) return licenseBlocked;
     try {
         const url = String(portalUrl || '').trim();
         if (!url) return { ok: false, noFallback: true };
@@ -855,6 +1189,8 @@ ipcMain.handle('portal-fallback-download', async (event, portalUrl) => {
 });
 
 ipcMain.handle('hdsc-download-study', async (event, portalUrl) => {
+    const licenseBlocked = licenseGuardResponse();
+    if (licenseBlocked) return licenseBlocked;
     try {
         const url = String(portalUrl || '').trim();
         if (!url || !isHdscPortalUrl(url)) {
@@ -905,11 +1241,46 @@ ipcMain.handle('hdsc-download-study', async (event, portalUrl) => {
 });
 
 ipcMain.handle('dicom-metadata-from-zip', async (_event, zipPath) => {
+    const licenseBlocked = licenseGuardResponse();
+    if (licenseBlocked) return licenseBlocked;
     try {
         const target = zipPath || getLatestZipPath();
         return await readMetadataFromZip(target);
     } catch (e) {
         return { ok: false, reason: e?.message || 'Failed to read metadata' };
+    }
+});
+
+ipcMain.handle('license-get-status', async () => getLicenseStatusPayload());
+
+ipcMain.handle('license-activate', async (_event, rawKey) => {
+    try {
+        if (!isLicenseRequired()) {
+            return { ok: true, activated: true, skipped: true };
+        }
+
+        const status = getLicenseStatusPayload();
+        if (status.activated) {
+            return { ok: true, activated: true, already: true, daysRemaining: status.daysRemaining };
+        }
+
+        saveLicenseActivation(rawKey);
+        const updated = getLicenseStatusPayload();
+        return {
+            ok: true,
+            activated: true,
+            daysRemaining: updated.daysRemaining,
+            expiryDate: updated.expiryDate,
+        };
+    } catch (e) {
+        const msg = String(e?.message || '');
+        if (msg.toLowerCase().includes('expired')) {
+            return { ok: false, error: 'expired' };
+        }
+        if (msg.toLowerCase().includes('clock')) {
+            return { ok: false, error: 'clock_tampered' };
+        }
+        return { ok: false, error: 'invalid' };
     }
 });
 
@@ -1043,10 +1414,106 @@ function collectDicomFiles(dir) {
     return dicomFiles;
 }
 
+function getStorescuDir() {
+    return path.join(app.getPath('userData'), 'dcmtk');
+}
+
+function getLocalStorescuPath() {
+    return path.join(getStorescuDir(), 'storescu.exe');
+}
+
+function findSystemStorescuCandidates() {
+    const candidates = [];
+    const add = (p) => {
+        if (p && fs.existsSync(p) && !candidates.includes(p)) candidates.push(p);
+    };
+
+    add('C:\\ProgramData\\chocolatey\\bin\\storescu.exe');
+    add('C:\\ProgramData\\chocolatey\\lib\\dcmtk\\tools\\storescu.exe');
+    add(path.join(process.env.ProgramFiles || 'C:\\Program Files', 'DCMTK', 'bin', 'storescu.exe'));
+
+    const chocoRoot = process.env.ChocolateyInstall || 'C:\\ProgramData\\chocolatey';
+    add(path.join(chocoRoot, 'bin', 'storescu.exe'));
+    add(path.join(chocoRoot, 'lib', 'dcmtk', 'tools', 'storescu.exe'));
+
+    try {
+        const libDir = path.join(chocoRoot, 'lib');
+        if (fs.existsSync(libDir)) {
+            for (const entry of fs.readdirSync(libDir, { withFileTypes: true })) {
+                if (!entry.isDirectory() || !/dcmtk/i.test(entry.name)) continue;
+                add(path.join(libDir, entry.name, 'tools', 'storescu.exe'));
+                add(path.join(libDir, entry.name, 'bin', 'storescu.exe'));
+            }
+        }
+    } catch { /* ignore */ }
+
+    return candidates;
+}
+
+async function unblockWindowsFile(filePath) {
+    if (process.platform !== 'win32' || !filePath || !fs.existsSync(filePath)) return;
+    try {
+        await execFileAsync('powershell.exe', [
+            '-NoProfile',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-Command',
+            `Unblock-File -LiteralPath '${String(filePath).replace(/'/g, "''")}' -ErrorAction SilentlyContinue`,
+        ], { windowsHide: true });
+    } catch { /* ignore */ }
+}
+
+async function copyStorescuSupportFiles(sourceDir, destDir) {
+    let copied = false;
+    for (const file of fs.readdirSync(sourceDir)) {
+        if (!/\.(exe|dll)$/i.test(file)) continue;
+        if (file.toLowerCase() === 'storescu.exe') continue;
+        const src = path.join(sourceDir, file);
+        const dest = path.join(destDir, file);
+        try {
+            if (!fs.existsSync(dest)) fs.copyFileSync(src, dest);
+            await unblockWindowsFile(dest);
+            copied = true;
+        } catch { /* ignore */ }
+    }
+    return copied;
+}
+
+let storescuReadyPromise = null;
+
+async function ensureStorescuReady() {
+    if (storescuReadyPromise) return storescuReadyPromise;
+
+    storescuReadyPromise = (async () => {
+        const localPath = getLocalStorescuPath();
+        if (fs.existsSync(localPath)) {
+            await unblockWindowsFile(localPath);
+            return localPath;
+        }
+
+        const sources = findSystemStorescuCandidates();
+        if (!sources.length) return null;
+
+        const sourcePath = sources[0];
+        const destDir = getStorescuDir();
+        fs.mkdirSync(destDir, { recursive: true });
+        fs.copyFileSync(sourcePath, localPath);
+        await copyStorescuSupportFiles(path.dirname(sourcePath), destDir);
+        await unblockWindowsFile(localPath);
+        return localPath;
+    })().catch((err) => {
+        storescuReadyPromise = null;
+        throw err;
+    });
+
+    return storescuReadyPromise;
+}
+
 function getStorescuPath() {
-    const chocolateyStorescu = 'C:\\ProgramData\\chocolatey\\bin\\storescu.exe';
-    if (fs.existsSync(chocolateyStorescu)) return chocolateyStorescu;
-    return 'storescu';
+    const localPath = getLocalStorescuPath();
+    if (fs.existsSync(localPath)) return localPath;
+    const candidates = findSystemStorescuCandidates();
+    return candidates[0] || 'storescu';
 }
 
 /** Windows cmd.exe limit is ~8191 chars — send in batches via execFile */
@@ -1073,6 +1540,7 @@ async function runStorescuBatch(storescuPath, aeTitle, ip, port, files) {
     const { stdout, stderr } = await execFileAsync(storescuPath, args, {
         maxBuffer: 10 * 1024 * 1024,
         windowsHide: true,
+        cwd: path.dirname(storescuPath),
     });
     if (isFatalStorescuOutput(stdout, stderr)) {
         const reason = String(stderr || stdout || 'storescu failed').substring(0, 300);
@@ -1082,7 +1550,10 @@ async function runStorescuBatch(storescuPath, aeTitle, ip, port, files) {
 }
 
 async function sendDicomFilesWithStorescu(dicomFiles, aeTitle, ip, port) {
-    const storescuPath = getStorescuPath();
+    const storescuPath = await ensureStorescuReady();
+    if (!storescuPath || !fs.existsSync(storescuPath)) {
+        throw new Error('storescu not found. Install DCMTK or allow storescu in Windows Smart App Control.');
+    }
     const batches = chunkArray(dicomFiles, STORESCU_BATCH_MAX_FILES);
     let lastOutput = '';
 
@@ -1100,6 +1571,9 @@ async function sendDicomFilesWithStorescu(dicomFiles, aeTitle, ip, port) {
 }
 
 ipcMain.handle('send-dicom-files', async (_event, params) => {
+    const licenseBlocked = licenseGuardResponse();
+    if (licenseBlocked) return licenseBlocked;
+
     const { aeTitle, port, ip, assignedMetadata } = params || {};
     if (!aeTitle || !port || !ip) {
         return { ok: false, reason: 'Missing IP, port, or AE Title' };
@@ -1139,6 +1613,13 @@ ipcMain.handle('send-dicom-files', async (_event, params) => {
             output: sendResult.output,
         };
     } catch (e) {
+        const msg = String(e?.message || '');
+        if (/smart app control|blocked|access denied|0x800711c7/i.test(msg)) {
+            return {
+                ok: false,
+                reason: 'Windows Smart App Control blocked storescu. Allow the app in Windows Security or reinstall DCMTK, then try again.',
+            };
+        }
         return { ok: false, reason: e?.message || 'storescu execution failed' };
     } finally {
         try { fs.rmSync(extractDir, { recursive: true, force: true }); } catch { }
@@ -1268,6 +1749,8 @@ ipcMain.handle('assign-study-settings-get', () => {
 });
 
 ipcMain.handle('mwl-query', async (_event, params) => {
+    const licenseBlocked = licenseGuardResponse();
+    if (licenseBlocked) return licenseBlocked;
     try {
         const { ip, port, aeTitle, startDate, endDate, maxResults } = params || {};
         if (!ip || !port || !aeTitle) {

@@ -56,6 +56,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	},
 	getAppLanguage: () => ipcRenderer.invoke('app-language-get'),
 	setAppLanguage: (lang) => ipcRenderer.invoke('app-language-set', lang),
+	licenseGetStatus: () => ipcRenderer.invoke('license-get-status'),
+	licenseActivate: (key) => ipcRenderer.invoke('license-activate', key),
 	onWebPreviewEnabledChanged: (handler) => {
 		if (typeof handler !== 'function') return;
 		ipcRenderer.on('web-preview-enabled-changed', (_evt, payload) => handler(payload));

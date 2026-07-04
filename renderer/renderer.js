@@ -114,8 +114,23 @@ const settingsClose = document.getElementById('settings-close');
 const settingsAdminPanel = document.getElementById('settings-admin-panel');
 const settingsChangeLanguage = document.getElementById('settings-change-language');
 const settingsPreviewToggle = document.getElementById('settings-preview-toggle');
+const licenseModal = document.getElementById('license-modal');
+const licenseKeyInput = document.getElementById('license-key-input');
+const licenseActivateBtn = document.getElementById('license-activate-btn');
+const licenseErrorEl = document.getElementById('license-error');
+const licensePromptEl = document.getElementById('license-prompt');
+const licenseTitleEl = document.getElementById('license-modal-title');
+const settingsLicenseStatus = document.getElementById('settings-license-status');
 
-const t = (key) => window.i18n?.t(key) ?? key;
+const t = (key, vars) => {
+	let str = window.i18n?.t(key) ?? key;
+	if (vars && typeof vars === 'object') {
+		for (const [k, v] of Object.entries(vars)) {
+			str = str.replaceAll(`{${k}}`, String(v));
+		}
+	}
+	return str;
+};
 
 let scanCompleteTimer = null;
 let wedgeScanActive = false;
@@ -124,6 +139,7 @@ function refreshDynamicLabels() {
 	if (loadBtn && !loadInProgress) loadBtn.textContent = t('load');
 	if (assignStudyBtn && !assignStudyInProgress) assignStudyBtn.textContent = t('assignStudy');
 	if (importProgressText && !importInProgress) importProgressText.textContent = t('readyToImport');
+	if (importStepTitle && !importInProgress) importStepTitle.textContent = t('step3Title');
 	for (const el of [metaPatientName, metaPatientId, metaDob, metaGender, metaModality]) {
 		if (el?.classList.contains('meta-missing')) el.textContent = t('notAvailable');
 	}
@@ -153,6 +169,7 @@ async function syncSettingsPreviewToggle() {
 
 function openSettingsModal() {
 	syncSettingsPreviewToggle();
+	refreshSettingsLicenseStatus();
 	if (settingsModal) openModal(settingsModal);
 }
 
@@ -184,6 +201,7 @@ function selectLanguage(lang) {
 
 document.addEventListener('app-language-changed', () => {
 	refreshDynamicLabels();
+	refreshSettingsLicenseStatus();
 	if (window.electronAPI?.webPreviewGetEnabled) {
 		window.electronAPI.webPreviewGetEnabled().then((res) => {
 			if (res?.ok) applyWebPreviewEnabled(res.enabled);
@@ -192,6 +210,198 @@ document.addEventListener('app-language-changed', () => {
 });
 
 window.i18n?.initLanguage();
+
+function normalizeLicenseInputValue(raw) {
+	return String(raw || '').replace(/\D/g, '').slice(0, 16);
+}
+
+function formatLicenseInputValue(raw) {
+	const digits = normalizeLicenseInputValue(raw);
+	return digits.replace(/(\d{4})(?=\d)/g, '$1-');
+}
+
+function setLicenseError(message = '') {
+	if (licenseErrorEl) licenseErrorEl.textContent = message;
+}
+
+function openLicenseModal({ expired = false, clockTampered = false } = {}) {
+	if (!licenseModal) return;
+	setLicenseError('');
+	if (licenseTitleEl) {
+		if (clockTampered) licenseTitleEl.textContent = t('licenseClockTampered');
+		else licenseTitleEl.textContent = expired ? t('licenseEnded') : t('licenseTitle');
+	}
+	if (licensePromptEl) {
+		if (clockTampered) licensePromptEl.textContent = t('licenseClockTamperedPrompt');
+		else licensePromptEl.textContent = expired ? t('licenseEndedPrompt') : t('licensePrompt');
+	}
+	if (licenseKeyInput) licenseKeyInput.value = '';
+	openModal(licenseModal);
+	requestAnimationFrame(() => licenseKeyInput?.focus());
+}
+
+function setLicenseBlocked(blocked) {
+	document.body.classList.toggle('license-blocked', Boolean(blocked));
+}
+
+async function refreshSettingsLicenseStatus() {
+	if (!settingsLicenseStatus || !window.electronAPI?.licenseGetStatus) return;
+	try {
+		const status = await window.electronAPI.licenseGetStatus();
+		if (!status?.required) {
+			settingsLicenseStatus.textContent = '';
+			settingsLicenseStatus.hidden = true;
+			return;
+		}
+		settingsLicenseStatus.hidden = false;
+		if (status.activated && !status.expired) {
+			if (status.hoursRemaining != null && status.hoursRemaining <= 12) {
+				settingsLicenseStatus.textContent = t('licenseExpiringSoon', { hours: status.hoursRemaining });
+			} else if (status.daysRemaining != null && status.daysRemaining >= 1) {
+				settingsLicenseStatus.textContent = t('licenseDaysRemaining', { days: status.daysRemaining });
+			} else {
+				settingsLicenseStatus.textContent = t('licenseExpiredToday');
+			}
+		} else if (status.clockTampered) {
+			settingsLicenseStatus.textContent = t('licenseClockTampered');
+		} else if (status.expired) {
+			settingsLicenseStatus.textContent = t('licenseEnded');
+		} else {
+			settingsLicenseStatus.textContent = t('licenseNotActivated');
+		}
+	} catch {
+		settingsLicenseStatus.textContent = '';
+		settingsLicenseStatus.hidden = true;
+	}
+}
+
+function openLicenseModalForced({ expired = false, clockTampered = false } = {}) {
+	openLicenseModal({ expired, clockTampered });
+}
+
+async function checkAndEnforceLicense({ allowPrompt = true } = {}) {
+	if (!window.electronAPI?.licenseGetStatus) return true;
+	let status;
+	try {
+		status = await window.electronAPI.licenseGetStatus();
+	} catch {
+		return true;
+	}
+	if (!status?.ok || !status.required) {
+		setLicenseBlocked(false);
+		return true;
+	}
+	if (status.activated && !status.expired) {
+		setLicenseBlocked(false);
+		await refreshSettingsLicenseStatus();
+		return true;
+	}
+
+	setLicenseBlocked(true);
+	await refreshSettingsLicenseStatus();
+	if (allowPrompt && !isOverlayOpen(licenseModal)) {
+		openLicenseModalForced({
+			expired: Boolean(status.expired),
+			clockTampered: Boolean(status.clockTampered),
+		});
+	}
+	return false;
+}
+
+function handleLicenseApiError(res) {
+	if (res?.error === 'license_expired' || res?.error === 'clock_tampered') {
+		checkAndEnforceLicense({ allowPrompt: true });
+		return true;
+	}
+	return false;
+}
+
+async function ensureLicenseActivated() {
+	if (!window.electronAPI?.licenseGetStatus) return true;
+	let status;
+	try {
+		status = await window.electronAPI.licenseGetStatus();
+	} catch {
+		return true;
+	}
+	if (!status?.ok || !status.required) return true;
+	if (status.activated && !status.expired) {
+		setLicenseBlocked(false);
+		return true;
+	}
+
+	setLicenseBlocked(true);
+	openLicenseModal({ expired: Boolean(status.expired), clockTampered: Boolean(status.clockTampered) });
+
+	return new Promise((resolve) => {
+		let done = false;
+		const finish = (ok) => {
+			if (done) return;
+			done = true;
+			cleanup();
+			if (ok) closeModal(licenseModal);
+			resolve(ok);
+		};
+
+		const onActivate = async () => {
+			const key = normalizeLicenseInputValue(licenseKeyInput?.value || '');
+			if (key.length !== 16) {
+				setLicenseError(t('licenseInvalid'));
+				return;
+			}
+			if (licenseActivateBtn) licenseActivateBtn.disabled = true;
+			try {
+				const res = await window.electronAPI.licenseActivate(key);
+				if (res?.ok && res.activated) {
+					setLicenseError('');
+					setLicenseBlocked(false);
+					await refreshSettingsLicenseStatus();
+					finish(true);
+					return;
+				}
+				if (res?.error === 'expired') {
+					setLicenseError(t('licenseEnded'));
+				} else if (res?.error === 'clock_tampered') {
+					setLicenseError(t('licenseClockTampered'));
+				} else {
+					setLicenseError(t('licenseInvalid'));
+				}
+			} catch {
+				setLicenseError(t('licenseInvalid'));
+			} finally {
+				if (licenseActivateBtn) licenseActivateBtn.disabled = false;
+			}
+		};
+
+		const onKey = (e) => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				onActivate();
+			}
+		};
+
+		const onInput = () => {
+			if (!licenseKeyInput) return;
+			const formatted = formatLicenseInputValue(licenseKeyInput.value);
+			if (licenseKeyInput.value !== formatted) licenseKeyInput.value = formatted;
+			if (licenseErrorEl?.textContent) setLicenseError('');
+		};
+
+		const cleanup = () => {
+			if (licenseActivateBtn) licenseActivateBtn.removeEventListener('click', onActivate);
+			if (licenseKeyInput) {
+				licenseKeyInput.removeEventListener('keydown', onKey);
+				licenseKeyInput.removeEventListener('input', onInput);
+			}
+		};
+
+		if (licenseActivateBtn) licenseActivateBtn.addEventListener('click', onActivate);
+		if (licenseKeyInput) {
+			licenseKeyInput.addEventListener('keydown', onKey);
+			licenseKeyInput.addEventListener('input', onInput);
+		}
+	});
+}
 
 (async () => {
 	try {
@@ -203,6 +413,10 @@ window.i18n?.initLanguage();
 		}
 	} catch { /* ignore */ }
 	refreshDynamicLabels();
+	await ensureLicenseActivated();
+	setInterval(() => {
+		checkAndEnforceLicense({ allowPrompt: true });
+	}, 30000);
 })();
 
 const DCM4CHEE_DOWNLOAD_BASE =
@@ -405,7 +619,7 @@ function renderBrowserDownloadProgress(payload) {
 		}
 		nameEl.textContent = filename;
 		barEl.classList.add('is-indeterminate');
-		metaEl.textContent = payload.message || t('downloadPreparing');
+		metaEl.textContent = t('studyPreparingYourStudy');
 		return;
 	}
 
@@ -960,7 +1174,8 @@ function resumePreviewIfIdle() {
 		isOverlayOpen(jivexPasswordModal) ||
 		isOverlayOpen(operationSuccessModal) ||
 		isOverlayOpen(languageModal) ||
-		isOverlayOpen(settingsModal)
+		isOverlayOpen(settingsModal) ||
+		isOverlayOpen(licenseModal)
 	) {
 		return;
 	}
@@ -1303,7 +1518,7 @@ function resetImportUi() {
 	if (loadBtn) loadBtn.disabled = false;
 	if (eyeBtn) eyeBtn.disabled = false;
 	showImportProgressBar();
-	setImportProgress(0, 'Ready to import', 'Step 3: Import in progress…');
+	setImportProgress(0, t('readyToImport'), t('step3Title'));
 }
 
 const META_FIELDS = [
@@ -1915,7 +2130,7 @@ async function handleAddToPacs() {
 			setImportProgress(
 				25,
 				'You may continue (25%) — using study from Load / Assign',
-				'Step 3: Import in progress…'
+				t('step3Title')
 			);
 			if (!importPatientName && cached.path && window.electronAPI.getDicomMetadataFromZip) {
 				const metaRes = await window.electronAPI.getDicomMetadataFromZip(cached.path);
@@ -1935,7 +2150,7 @@ async function handleAddToPacs() {
 			return;
 		}
 
-		setImportProgress(45, 'You may continue (45%) — preparing send…', 'Step 3: Import in progress…');
+		setImportProgress(45, 'You may continue (45%) — preparing send…', t('step3Title'));
 
 		const params = await resolveSendParams();
 		if (importAborted) return;
@@ -1948,15 +2163,18 @@ async function handleAddToPacs() {
 
 		const sendParams = { ...params };
 		if (assignedStudyForExport) {
-			setImportProgress(55, 'You may continue (55%) — applying assigned patient metadata…', 'Step 3: Import in progress…');
+			setImportProgress(55, 'You may continue (55%) — applying assigned patient metadata…', t('step3Title'));
 			sendParams.assignedMetadata = assignedStudyForExport;
 		}
 
-		setImportProgress(70, `You may continue (70%) — sending to ${params.ip}:${params.port}…`, 'Step 3: Import in progress…');
+		setImportProgress(70, `You may continue (70%) — sending to ${params.ip}:${params.port}…`, t('step3Title'));
 
 		const sendRes = await window.electronAPI.sendDicomFiles(sendParams);
 		if (importAborted) return;
-		if (!sendRes?.ok) throw new Error(sendRes?.reason || 'Send failed');
+		if (!sendRes?.ok) {
+			if (handleLicenseApiError(sendRes)) throw new Error(t('licenseEnded'));
+			throw new Error(sendRes?.reason || 'Send failed');
+		}
 
 		const n = sendRes.filesSent || 0;
 		let patientName = importPatientName;
@@ -2282,6 +2500,10 @@ async function sendDicom(params) {
 	if (res && res.ok) {
 		updateStatus(`Sent ${res.filesSent || 0} DICOM files successfully`);
 		return true;
+	}
+	if (handleLicenseApiError(res)) {
+		updateStatus(t('licenseEnded'), true);
+		return false;
 	}
 	updateStatus(res && res.reason ? res.reason : 'Failed to send files', true);
 	return false;
