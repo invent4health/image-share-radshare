@@ -16,7 +16,7 @@ import { applyAssignedMetadataToDicomFiles } from './lib/dicom-modify.js';
 import { downloadHdscStudyFromPreview, injectHdscSavePickerHook, isHdscPortalUrl } from './lib/hdsc-download.js';
 import { downloadGoogleDriveToFile, resolveHdscFallbackDownload, resolvePortalFallbackDownload } from './lib/hdsc-fallback-sources.js';
 import { downloadJivexStudyWithSeleniumInPreview } from './lib/jivex-selenium.js';
-import { isJivexPortalUrl } from './lib/jivex-download.js';
+import { detectJivexPasswordFormat, isJivexPortalUrl } from './lib/jivex-download.js';
 import {
     daysSinceEpoch,
     normalizeLicenseKey,
@@ -412,9 +412,10 @@ function toMwlSummary(study) {
     };
 }
 const PREVIEW_ZOOM_FACTOR = 0.75;
-const LEFT_PANEL_WIDTH = 380;
+const LEFT_PANEL_WIDTH = 480;
 const DEFAULT_WINDOW_WIDTH = 1400;
-const MENU_ONLY_WINDOW_WIDTH = LEFT_PANEL_WIDTH + 24;
+const MENU_ONLY_WINDOW_WIDTH = LEFT_PANEL_WIDTH;
+const MENU_ONLY_WINDOW_HEIGHT = 738;
 const WINDOW_HEIGHT_RATIO = 0.95;
 
 function getPrimaryWorkArea() {
@@ -512,7 +513,7 @@ async function createWindow() {
             try { winIcon = winIcon.resize({ width: 256, height: 256, quality: 'best' }); } catch { }
         }
     }
-    const initialHeight = getDefaultWindowHeight();
+    const initialHeight = MENU_ONLY_WINDOW_HEIGHT;
     const initialBounds = getCenteredWindowBounds(MENU_ONLY_WINDOW_WIDTH, initialHeight);
     mainWindow = new BrowserWindow({
         ...initialBounds,
@@ -659,8 +660,7 @@ function setWebPreviewEnabled(enabled) {
         }
         if (wasEnabled) {
             try {
-                const b = mainWindow.getBounds();
-                mainWindow.setSize(MENU_ONLY_WINDOW_WIDTH, b.height);
+                mainWindow.setSize(MENU_ONLY_WINDOW_WIDTH, MENU_ONLY_WINDOW_HEIGHT);
             } catch { }
         }
     }
@@ -860,6 +860,11 @@ ipcMain.handle('load-website', async (event, url) => {
     if (!webPreviewEnabled) return { success: false, error: 'Web preview is disabled' };
     loadWebsite(url);
     return { success: true };
+});
+
+ipcMain.handle('app-quit', async () => {
+    app.quit();
+    return { ok: true };
 });
 
 ipcMain.handle('app-language-get', async () => {
@@ -1097,6 +1102,46 @@ async function downloadMappedPortalZip(event, fallback, logLabel = 'Portal') {
 }
 
 let jivexDownloadInProgress = false;
+
+const DEFAULT_JIVEX_PASSWORD_FORMAT = {
+    ok: true,
+    formatType: 'date',
+    format: 'DD-MM-YYYY',
+    placeholder: 'DD-MM-YYYY',
+    title: 'Password',
+    hint: '',
+};
+
+ipcMain.handle('jivex-detect-password-format', async (_event, portalUrl) => {
+    const licenseBlocked = licenseGuardResponse();
+    if (licenseBlocked) return licenseBlocked;
+
+    const url = String(portalUrl || '').trim();
+    if (!url || !isJivexPortalUrl(url)) {
+        return { ok: false, error: 'Not a valid Jivex portal link' };
+    }
+
+    const preview = ensurePreviewViewForAutomation();
+    if (!preview) {
+        return { ...DEFAULT_JIVEX_PASSWORD_FORMAT };
+    }
+
+    try {
+        const detected = await detectJivexPasswordFormat(preview, url);
+        if (detected?.ok && detected.formatType === 'date' && detected.format) {
+            return detected;
+        }
+        return { ...DEFAULT_JIVEX_PASSWORD_FORMAT, title: detected?.title || 'Password' };
+    } catch (e) {
+        releaseAutomationPreviewView();
+        return { ...DEFAULT_JIVEX_PASSWORD_FORMAT, detectError: e?.message || String(e) };
+    }
+});
+
+ipcMain.handle('jivex-release-preview', async () => {
+    releaseAutomationPreviewView();
+    return { ok: true };
+});
 
 ipcMain.handle('jivex-download-study', async (_event, params) => {
     const licenseBlocked = licenseGuardResponse();
@@ -1414,40 +1459,39 @@ function collectDicomFiles(dir) {
     return dicomFiles;
 }
 
-function getStorescuDir() {
-    return path.join(app.getPath('userData'), 'dcmtk');
-}
-
-function getLocalStorescuPath() {
-    return path.join(getStorescuDir(), 'storescu.exe');
-}
-
-function findSystemStorescuCandidates() {
-    const candidates = [];
-    const add = (p) => {
-        if (p && fs.existsSync(p) && !candidates.includes(p)) candidates.push(p);
-    };
-
-    add('C:\\ProgramData\\chocolatey\\bin\\storescu.exe');
-    add('C:\\ProgramData\\chocolatey\\lib\\dcmtk\\tools\\storescu.exe');
-    add(path.join(process.env.ProgramFiles || 'C:\\Program Files', 'DCMTK', 'bin', 'storescu.exe'));
-
-    const chocoRoot = process.env.ChocolateyInstall || 'C:\\ProgramData\\chocolatey';
-    add(path.join(chocoRoot, 'bin', 'storescu.exe'));
-    add(path.join(chocoRoot, 'lib', 'dcmtk', 'tools', 'storescu.exe'));
-
+function isLikelyChocolateyShim(exePath) {
     try {
-        const libDir = path.join(chocoRoot, 'lib');
-        if (fs.existsSync(libDir)) {
-            for (const entry of fs.readdirSync(libDir, { withFileTypes: true })) {
-                if (!entry.isDirectory() || !/dcmtk/i.test(entry.name)) continue;
-                add(path.join(libDir, entry.name, 'tools', 'storescu.exe'));
-                add(path.join(libDir, entry.name, 'bin', 'storescu.exe'));
-            }
-        }
-    } catch { /* ignore */ }
+        return fs.statSync(exePath).size > 200000;
+    } catch {
+        return false;
+    }
+}
 
-    return candidates;
+function findStorescuInDir(dir) {
+    if (!dir || !fs.existsSync(dir)) return null;
+
+    const candidates = [
+        path.join(dir, 'storescu.exe'),
+        path.join(dir, 'bin', 'storescu.exe'),
+    ];
+
+    for (const candidate of candidates) {
+        if (fs.existsSync(candidate) && !isLikelyChocolateyShim(candidate)) {
+            return candidate;
+        }
+    }
+    return null;
+}
+
+function getBundledStorescuDir() {
+    if (app.isPackaged) {
+        return path.join(process.resourcesPath, 'dcmtk');
+    }
+    return path.join(__dirname, 'dcmtk');
+}
+
+function getBundledStorescuPath() {
+    return findStorescuInDir(getBundledStorescuDir());
 }
 
 async function unblockWindowsFile(filePath) {
@@ -1463,20 +1507,32 @@ async function unblockWindowsFile(filePath) {
     } catch { /* ignore */ }
 }
 
-async function copyStorescuSupportFiles(sourceDir, destDir) {
-    let copied = false;
-    for (const file of fs.readdirSync(sourceDir)) {
-        if (!/\.(exe|dll)$/i.test(file)) continue;
-        if (file.toLowerCase() === 'storescu.exe') continue;
-        const src = path.join(sourceDir, file);
-        const dest = path.join(destDir, file);
-        try {
-            if (!fs.existsSync(dest)) fs.copyFileSync(src, dest);
-            await unblockWindowsFile(dest);
-            copied = true;
-        } catch { /* ignore */ }
-    }
-    return copied;
+async function unblockStorescuDirectory(dir) {
+    if (process.platform !== 'win32' || !dir || !fs.existsSync(dir)) return;
+    try {
+        for (const file of fs.readdirSync(dir)) {
+            if (/\.(exe|dll)$/i.test(file)) {
+                await unblockWindowsFile(path.join(dir, file));
+            }
+        }
+    } catch { /* ignore */ }
+}
+
+function getStorescuDir() {
+    return getBundledStorescuDir();
+}
+
+function getLocalStorescuPath() {
+    return getBundledStorescuPath();
+}
+
+function findSystemStorescuCandidates() {
+    const bundled = getBundledStorescuPath();
+    return bundled ? [bundled] : [];
+}
+
+async function copyStorescuSupportFiles(_sourceDir, _destDir) {
+    return false;
 }
 
 let storescuReadyPromise = null;
@@ -1485,22 +1541,14 @@ async function ensureStorescuReady() {
     if (storescuReadyPromise) return storescuReadyPromise;
 
     storescuReadyPromise = (async () => {
-        const localPath = getLocalStorescuPath();
-        if (fs.existsSync(localPath)) {
-            await unblockWindowsFile(localPath);
-            return localPath;
+        const bundledDir = getBundledStorescuDir();
+        const bundledPath = getBundledStorescuPath();
+        if (!bundledPath) {
+            return null;
         }
-
-        const sources = findSystemStorescuCandidates();
-        if (!sources.length) return null;
-
-        const sourcePath = sources[0];
-        const destDir = getStorescuDir();
-        fs.mkdirSync(destDir, { recursive: true });
-        fs.copyFileSync(sourcePath, localPath);
-        await copyStorescuSupportFiles(path.dirname(sourcePath), destDir);
-        await unblockWindowsFile(localPath);
-        return localPath;
+        await unblockStorescuDirectory(bundledDir);
+        await unblockStorescuDirectory(path.dirname(bundledPath));
+        return bundledPath;
     })().catch((err) => {
         storescuReadyPromise = null;
         throw err;
@@ -1510,14 +1558,13 @@ async function ensureStorescuReady() {
 }
 
 function getStorescuPath() {
-    const localPath = getLocalStorescuPath();
-    if (fs.existsSync(localPath)) return localPath;
-    const candidates = findSystemStorescuCandidates();
-    return candidates[0] || 'storescu';
+    const bundledPath = getBundledStorescuPath();
+    if (fs.existsSync(bundledPath)) return bundledPath;
+    return null;
 }
 
-/** Windows cmd.exe limit is ~8191 chars — send in batches via execFile */
-const STORESCU_BATCH_MAX_FILES = 40;
+/** Windows cmd.exe limit is ~8191 chars — keep file batches well under that */
+const STORESCU_CMD_MAX_LEN = 5000;
 
 function chunkArray(items, size) {
     const chunks = [];
@@ -1525,6 +1572,90 @@ function chunkArray(items, size) {
         chunks.push(items.slice(i, i + size));
     }
     return chunks;
+}
+
+function chunkFilesByCommandLength(files, storescuPath, aeTitle, ip, port, maxLen = STORESCU_CMD_MAX_LEN) {
+    const baseLen =
+        String(storescuPath).length +
+        String(aeTitle).length +
+        String(ip).length +
+        String(port).length +
+        32;
+    const batches = [];
+    let batch = [];
+    let len = baseLen;
+
+    for (const file of files) {
+        const fileLen = String(file).length + 1;
+        if (batch.length > 0 && len + fileLen > maxLen) {
+            batches.push(batch);
+            batch = [];
+            len = baseLen;
+        }
+        batch.push(file);
+        len += fileLen;
+    }
+    if (batch.length) batches.push(batch);
+    return batches;
+}
+
+function formatStorescuError(err) {
+    const stderr = String(err?.stderr || '').trim();
+    const stdout = String(err?.stdout || '').trim();
+    const msg = String(err?.message || '').trim();
+    const detail = [stderr, stdout, msg].filter(Boolean).join('\n').trim();
+    const blob = detail || msg;
+
+    if (/smart app control|blocked|access denied|0x800711c7/i.test(blob)) {
+        return {
+            reason: 'Windows blocked the send tool. Allow it in Security settings.',
+            detail: blob,
+        };
+    }
+    if (/storescu not found|ENOENT/i.test(blob)) {
+        return {
+            reason: 'PACS send tool is not available on this computer.',
+            detail: blob,
+        };
+    }
+    if (/Cannot find file at|missing or moved file/i.test(blob)) {
+        return {
+            reason: 'PACS send tool is not available on this computer.',
+            detail: blob,
+        };
+    }
+    if (/ECONNREFUSED|Unable to connect|Connection refused|No route to host|connect timed out/i.test(blob)) {
+        return {
+            reason: 'Could not connect to PACS. Check IP address and port.',
+            detail: blob,
+        };
+    }
+    if (/Association.*reject|Called AE Title|Calling AE Title|Unknown AE|refused/i.test(blob)) {
+        return {
+            reason: 'PACS rejected the connection. Check AE Title settings.',
+            detail: blob,
+        };
+    }
+    if (/ENAMETOOLONG|command line is too long|spawn ENAMETOOLONG/i.test(blob)) {
+        return {
+            reason: 'Study is too large to send. Please contact support.',
+            detail: blob,
+        };
+    }
+
+    const cleanDetail = blob.replace(/^Command failed:[^\n]*(?:\n|$)/i, '').trim() || blob;
+    return {
+        reason: 'Save to PACS failed. Please try again.',
+        detail: cleanDetail.substring(0, 12000),
+    };
+}
+
+function throwStorescuError(err) {
+    const formatted = formatStorescuError(err);
+    const error = new Error(formatted.reason);
+    error.detail = formatted.detail;
+    error.shortReason = formatted.reason;
+    throw error;
 }
 
 function isFatalStorescuOutput(stdout, stderr) {
@@ -1535,37 +1666,68 @@ function isFatalStorescuOutput(stdout, stderr) {
     );
 }
 
-async function runStorescuBatch(storescuPath, aeTitle, ip, port, files) {
-    const args = ['-aec', String(aeTitle), String(ip), String(port), ...files];
-    const { stdout, stderr } = await execFileAsync(storescuPath, args, {
-        maxBuffer: 10 * 1024 * 1024,
-        windowsHide: true,
-        cwd: path.dirname(storescuPath),
-    });
-    if (isFatalStorescuOutput(stdout, stderr)) {
-        const reason = String(stderr || stdout || 'storescu failed').substring(0, 300);
-        throw new Error(reason);
+async function runStorescuArgs(storescuPath, args) {
+    try {
+        const { stdout, stderr } = await execFileAsync(storescuPath, args, {
+            maxBuffer: 10 * 1024 * 1024,
+            windowsHide: true,
+            cwd: path.dirname(storescuPath),
+        });
+        if (isFatalStorescuOutput(stdout, stderr)) {
+            throwStorescuError({ stderr, stdout, message: 'storescu failed' });
+        }
+        return { stdout, stderr };
+    } catch (e) {
+        if (e?.shortReason) throw e;
+        throwStorescuError(e);
     }
-    return { stdout, stderr };
 }
 
-async function sendDicomFilesWithStorescu(dicomFiles, aeTitle, ip, port) {
+async function runStorescuDirectory(storescuPath, aeTitle, ip, port, directory) {
+    const args = ['-aec', String(aeTitle), String(ip), String(port), '+sd', directory];
+    return runStorescuArgs(storescuPath, args);
+}
+
+async function runStorescuBatch(storescuPath, aeTitle, ip, port, files) {
+    const args = ['-aec', String(aeTitle), String(ip), String(port), ...files];
+    return runStorescuArgs(storescuPath, args);
+}
+
+async function sendDicomFilesWithStorescu(dicomFiles, aeTitle, ip, port, extractDir) {
     const storescuPath = await ensureStorescuReady();
     if (!storescuPath || !fs.existsSync(storescuPath)) {
-        throw new Error('storescu not found. Install DCMTK or allow storescu in Windows Smart App Control.');
+        const err = new Error('PACS send tool is not available. Real DCMTK files are missing from the dcmtk folder.');
+        err.detail = `Expected storescu.exe in ${getBundledStorescuDir()} (not Chocolatey shims).`;
+        err.shortReason = err.message;
+        throw err;
     }
-    const batches = chunkArray(dicomFiles, STORESCU_BATCH_MAX_FILES);
+
+    let batches = 0;
     let lastOutput = '';
 
-    for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i];
-        const { stdout, stderr } = await runStorescuBatch(storescuPath, aeTitle, ip, port, batch);
-        lastOutput = stdout || stderr || lastOutput;
+    // Prefer directory scan — avoids Windows command-line length limits entirely
+    try {
+        const { stdout, stderr } = await runStorescuDirectory(storescuPath, aeTitle, ip, port, extractDir);
+        lastOutput = stdout || stderr || 'Success';
+        batches = 1;
+    } catch (dirErr) {
+        const blob = String(dirErr?.detail || dirErr?.message || '');
+        const sdUnsupported =
+            /(\+sd|scan-director)/i.test(blob) &&
+            /(unknown|unrecognized|invalid).*(option|argument)/i.test(blob);
+        if (!sdUnsupported) throw dirErr;
+
+        const fileBatches = chunkFilesByCommandLength(dicomFiles, storescuPath, aeTitle, ip, port);
+        batches = fileBatches.length;
+        for (const batch of fileBatches) {
+            const { stdout, stderr } = await runStorescuBatch(storescuPath, aeTitle, ip, port, batch);
+            lastOutput = stdout || stderr || lastOutput;
+        }
     }
 
     return {
         filesSent: dicomFiles.length,
-        batches: batches.length,
+        batches,
         output: lastOutput || 'Success',
     };
 }
@@ -1603,7 +1765,7 @@ ipcMain.handle('send-dicom-files', async (_event, params) => {
             }
         }
 
-        const sendResult = await sendDicomFilesWithStorescu(dicomFiles, aeTitle, ip, port);
+        const sendResult = await sendDicomFilesWithStorescu(dicomFiles, aeTitle, ip, port, extractDir);
 
         return {
             ok: true,
@@ -1613,14 +1775,11 @@ ipcMain.handle('send-dicom-files', async (_event, params) => {
             output: sendResult.output,
         };
     } catch (e) {
-        const msg = String(e?.message || '');
-        if (/smart app control|blocked|access denied|0x800711c7/i.test(msg)) {
-            return {
-                ok: false,
-                reason: 'Windows Smart App Control blocked storescu. Allow the app in Windows Security or reinstall DCMTK, then try again.',
-            };
-        }
-        return { ok: false, reason: e?.message || 'storescu execution failed' };
+        return {
+            ok: false,
+            reason: e?.shortReason || e?.message || 'Save to PACS failed. Please try again.',
+            detail: e?.detail || String(e?.message || ''),
+        };
     } finally {
         try { fs.rmSync(extractDir, { recursive: true, force: true }); } catch { }
     }

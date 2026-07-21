@@ -48,6 +48,13 @@
       "!**/*.map"
     ],
     "asar": true,
+    "extraResources": [
+      {
+        "from": "dcmtk",
+        "to": "dcmtk",
+        "filter": ["**/*"]
+      }
+    ],
     "win": {
       "target": [
         {

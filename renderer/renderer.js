@@ -46,14 +46,34 @@ const importProgressFill = document.getElementById('import-progress-fill');
 const importProgressText = document.getElementById('import-progress-text');
 const importStepTitle = document.getElementById('import-step-title');
 const importProgressWrap = document.getElementById('import-progress-wrap');
+const importErrorPanel = document.getElementById('import-error-panel');
+const importErrorSummary = document.getElementById('import-error-summary');
+const importErrorLogsBtn = document.getElementById('import-error-logs-btn');
+const importLogsModal = document.getElementById('import-logs-modal');
+const importLogsContent = document.getElementById('import-logs-content');
+const importLogsClose = document.getElementById('import-logs-close');
+const importStepBackBtn = document.getElementById('import-step-back-btn');
+const assignStepBackBtn = document.getElementById('assign-step-back-btn');
+const importStatusHeading = document.getElementById('import-status-heading');
+const importStatusSub = document.getElementById('import-status-sub');
+const importIconCloud = document.getElementById('import-icon-cloud');
+const importIconSuccess = document.getElementById('import-icon-success');
+const importReadyActions = document.getElementById('import-ready-actions');
+const importSuccessActions = document.getElementById('import-success-actions');
+const importDoneBtn = document.getElementById('import-done-btn');
+const importAnotherBtn = document.getElementById('import-another-btn');
+const wizardStepSections = document.querySelectorAll('[data-wizard-step]');
+const wizardRailSteps = document.querySelectorAll('.wizard-rail-step');
+const skipAssignBtn = document.getElementById('skip-assign-btn');
 const operationSuccessModal = document.getElementById('operation-success-modal');
 const operationSuccessTitle = document.getElementById('operation-success-title');
 const operationSuccessMessage = document.getElementById('operation-success-message');
 const operationSuccessOk = document.getElementById('operation-success-ok');
-const jivexPasswordModal = document.getElementById('jivex-password-modal');
+const jivexPasswordInline = document.getElementById('jivex-password-inline');
+const jivexPasswordInlineHint = document.getElementById('jivex-password-inline-hint');
+const jivexPasswordFormatHint = document.getElementById('jivex-password-format-hint');
+const jivexPasswordInlineLabel = document.getElementById('jivex-password-inline-label');
 const jivexPortalPasswordInput = document.getElementById('jivex-portal-password');
-const jivexPasswordContinue = document.getElementById('jivex-password-continue');
-const jivexPasswordCancel = document.getElementById('jivex-password-cancel');
 const sendModal = document.getElementById('send-modal');
 const sendClose = document.getElementById('send-close');
 const sendSubmit = document.getElementById('send-submit');
@@ -134,12 +154,32 @@ const t = (key, vars) => {
 
 let scanCompleteTimer = null;
 let wedgeScanActive = false;
+let wizardStep = 1;
+let importSuccessShown = false;
 
 function refreshDynamicLabels() {
 	if (loadBtn && !loadInProgress) loadBtn.textContent = t('load');
 	if (assignStudyBtn && !assignStudyInProgress) assignStudyBtn.textContent = t('assignStudy');
-	if (importProgressText && !importInProgress) importProgressText.textContent = t('readyToImport');
-	if (importStepTitle && !importInProgress) importStepTitle.textContent = t('step3Title');
+	if (importStepTitle) {
+		if (importSuccessShown) importStepTitle.textContent = t('step3StudyImport');
+		else if (!importInProgress) {
+			importStepTitle.textContent = wizardStep === 3 ? t('step3ReadyTitle') : t('step3Title');
+		}
+	}
+	if (importStatusHeading) {
+		if (importSuccessShown) importStatusHeading.textContent = t('importSuccessful');
+		else if (wizardStep === 3 && !importInProgress) importStatusHeading.textContent = t('readyToImport');
+	}
+	if (importStatusSub) {
+		if (importSuccessShown) importStatusSub.textContent = t('importSuccessfulDesc');
+		else if (wizardStep === 3 && !importInProgress) importStatusSub.textContent = t('readyToImportDesc');
+	}
+	if (importProgressText && importSuccessShown) importProgressText.textContent = '100%';
+	if (jivexPasswordInlineLabel) jivexPasswordInlineLabel.textContent = t('password');
+	if (jivexPortalPasswordInput && jivexFormatInfo.formatType === 'date') {
+		jivexPortalPasswordInput.placeholder = jivexFormatInfo.format || DEFAULT_JIVEX_DATE_FORMAT;
+	}
+	updateJivexPasswordFormatHint();
 	for (const el of [metaPatientName, metaPatientId, metaDob, metaGender, metaModality]) {
 		if (el?.classList.contains('meta-missing')) el.textContent = t('notAvailable');
 	}
@@ -427,7 +467,252 @@ function isHdscPortalUrl(portalUrl) {
 }
 
 function isJivexPortalUrl(portalUrl) {
-	return /jivexmobile\.visus\.com/i.test(String(portalUrl || ''));
+	return /jivexmobile/i.test(String(portalUrl || '').trim());
+}
+
+const DEFAULT_JIVEX_DATE_FORMAT = 'DD-MM-YYYY';
+
+function getDefaultJivexPasswordFormat() {
+	return {
+		formatType: 'date',
+		format: DEFAULT_JIVEX_DATE_FORMAT,
+		placeholder: DEFAULT_JIVEX_DATE_FORMAT,
+		title: t('password'),
+		hint: '',
+	};
+}
+
+function mergeDetectedJivexPasswordFormat(detected) {
+	if (detected?.ok && detected.formatType === 'date' && detected.format) {
+		return {
+			formatType: 'date',
+			format: detected.format,
+			placeholder: detected.placeholder || detected.format,
+			title: detected.title || t('password'),
+			hint: detected.hint || '',
+		};
+	}
+	return getDefaultJivexPasswordFormat();
+}
+
+function validateJivexPasswordInput(value, formatInfo = {}) {
+	const pass = String(value || '').trim();
+	if (!pass) return { ok: false, message: t('passwordPlaceholder') };
+
+	if (formatInfo.formatType !== 'date') return { ok: true, value: pass };
+
+	const fmt = String(formatInfo.format || 'YYYY-MM-DD').toUpperCase();
+	const patterns = {
+		'YYYY-MM-DD': /^\d{4}-\d{2}-\d{2}$/,
+		'DD-MM-YYYY': /^\d{2}-\d{2}-\d{4}$/,
+		'MM-DD-YYYY': /^\d{2}-\d{2}-\d{4}$/,
+		'DD.MM.YYYY': /^\d{2}\.\d{2}\.\d{4}$/,
+	};
+	const pattern = patterns[fmt] || patterns['YYYY-MM-DD'];
+	if (!pattern.test(pass)) {
+		return { ok: false, message: t('jivexPasswordInvalidDate', { format: formatInfo.format || fmt }) };
+	}
+	return { ok: true, value: pass };
+}
+
+function getJivexDateFormatSpec(formatStr) {
+	const fmt = String(formatStr || 'YYYY-MM-DD').toUpperCase();
+	const specs = {
+		'YYYY-MM-DD': { separator: '-', groups: [4, 2, 2], maxDigits: 8 },
+		'DD-MM-YYYY': { separator: '-', groups: [2, 2, 4], maxDigits: 8 },
+		'MM-DD-YYYY': { separator: '-', groups: [2, 2, 4], maxDigits: 8 },
+		'DD.MM.YYYY': { separator: '.', groups: [2, 2, 4], maxDigits: 8 },
+	};
+	return specs[fmt] || specs['YYYY-MM-DD'];
+}
+
+function formatJivexDateDigits(digits, formatStr) {
+	const spec = getJivexDateFormatSpec(formatStr);
+	const d = String(digits || '').replace(/\D/g, '').slice(0, spec.maxDigits);
+	let out = '';
+	let pos = 0;
+	for (const len of spec.groups) {
+		const chunk = d.slice(pos, pos + len);
+		if (!chunk) break;
+		if (out) out += spec.separator;
+		out += chunk;
+		pos += len;
+	}
+	return out;
+}
+
+function updateJivexPasswordFormatHint() {
+	if (!jivexPasswordFormatHint) return;
+	const isDate = jivexFormatInfo.formatType === 'date' && jivexFormatInfo.format;
+	jivexPasswordFormatHint.textContent = isDate ? jivexFormatInfo.format : '';
+}
+
+function applyJivexDatePasswordMask() {
+	if (!jivexPortalPasswordInput || jivexFormatInfo.formatType !== 'date') return;
+
+	const input = jivexPortalPasswordInput;
+	const start = input.selectionStart ?? input.value.length;
+	const digitsBefore = input.value.slice(0, start).replace(/\D/g, '').length;
+	const formatted = formatJivexDateDigits(input.value, jivexFormatInfo.format);
+
+	if (input.value !== formatted) {
+		input.value = formatted;
+	}
+
+	let digitCount = 0;
+	let newPos = formatted.length;
+	for (let i = 0; i < formatted.length; i += 1) {
+		if (/\d/.test(formatted[i])) {
+			digitCount += 1;
+			if (digitCount >= digitsBefore) {
+				newPos = i + 1;
+				break;
+			}
+		}
+	}
+	input.setSelectionRange(newPos, newPos);
+}
+
+function handleJivexPasswordInput() {
+	clearJivexPasswordInlineError();
+	if (jivexFormatInfo.formatType === 'date') {
+		applyJivexDatePasswordMask();
+	}
+}
+
+function configureJivexPasswordInline(formatInfo = {}, { resetValue = false } = {}) {
+	const prevFormat = jivexFormatInfo.format;
+	jivexFormatInfo = {
+		formatType: formatInfo.formatType || 'text',
+		format: formatInfo.format || '',
+		placeholder: formatInfo.placeholder || t('passwordPlaceholder'),
+		title: formatInfo.title || t('password'),
+		hint: formatInfo.hint || '',
+	};
+
+	if (jivexPasswordInlineLabel) jivexPasswordInlineLabel.textContent = t('password');
+
+	const isDate = jivexFormatInfo.formatType === 'date';
+	updateJivexPasswordFormatHint();
+
+	if (jivexPasswordInlineHint) {
+		jivexPasswordInlineHint.classList.remove('is-error', 'is-detecting');
+		if (!isDate && jivexFormatInfo.hint) {
+			jivexPasswordInlineHint.textContent = jivexFormatInfo.hint;
+		} else {
+			jivexPasswordInlineHint.textContent = '';
+		}
+	}
+
+	if (jivexPortalPasswordInput) {
+		const formatChanged = prevFormat !== jivexFormatInfo.format;
+		if (resetValue || formatChanged) {
+			jivexPortalPasswordInput.value = '';
+		} else if (isDate && jivexPortalPasswordInput.value) {
+			applyJivexDatePasswordMask();
+		}
+
+		jivexPortalPasswordInput.placeholder = isDate
+			? jivexFormatInfo.format || jivexFormatInfo.placeholder
+			: jivexFormatInfo.placeholder;
+		jivexPortalPasswordInput.setAttribute('autocomplete', 'off');
+		jivexPortalPasswordInput.setAttribute('spellcheck', 'false');
+		jivexPortalPasswordInput.setAttribute('inputmode', isDate ? 'numeric' : 'text');
+	}
+}
+
+let jivexFormatInfo = {
+	formatType: 'text',
+	format: '',
+	placeholder: '',
+	title: '',
+	hint: '',
+};
+let jivexFormatDetectSeq = 0;
+let jivexFormatDetectPromise = null;
+let lastJivexDetectUrl = '';
+
+function setJivexPasswordInlineError(message) {
+	if (!jivexPasswordInline) return;
+	jivexPasswordInline.classList.add('is-error');
+	if (jivexPasswordInlineHint) {
+		jivexPasswordInlineHint.textContent = message || '';
+		jivexPasswordInlineHint.classList.add('is-error');
+	}
+	window.setTimeout(() => {
+		jivexPasswordInline?.classList.remove('is-error');
+	}, 450);
+}
+
+function clearJivexPasswordInlineError() {
+	jivexPasswordInline?.classList.remove('is-error');
+	if (jivexPasswordInlineHint) {
+		jivexPasswordInlineHint.textContent = '';
+		jivexPasswordInlineHint.classList.remove('is-error', 'is-detecting');
+	}
+	updateJivexPasswordFormatHint();
+}
+
+async function detectJivexPasswordFormat(url) {
+	const seq = ++jivexFormatDetectSeq;
+	jivexPasswordInline?.classList.add('is-detecting');
+	if (jivexPasswordInlineHint) {
+		jivexPasswordInlineHint.textContent = t('jivexPasswordDetecting');
+		jivexPasswordInlineHint.classList.add('is-detecting');
+		jivexPasswordInlineHint.classList.remove('is-error');
+	}
+
+	let formatInfo = getDefaultJivexPasswordFormat();
+
+	const run = (async () => {
+		try {
+			if (window.electronAPI?.jivexDetectPasswordFormat) {
+				const detected = await window.electronAPI.jivexDetectPasswordFormat(url);
+				if (seq !== jivexFormatDetectSeq) return formatInfo;
+				formatInfo = mergeDetectedJivexPasswordFormat(detected);
+			}
+		} catch {
+			/* keep default date format */
+		} finally {
+			if (seq === jivexFormatDetectSeq) {
+				jivexPasswordInline?.classList.remove('is-detecting');
+				configureJivexPasswordInline(formatInfo);
+			}
+		}
+		return formatInfo;
+	})();
+
+	jivexFormatDetectPromise = run;
+	return run;
+}
+
+function syncJivexPasswordField() {
+	if (!jivexPasswordInline || !urlInput) return;
+
+	const url = urlInput.value.trim();
+	const isJivex = Boolean(url) && isJivexPortalUrl(url);
+
+	if (isJivex) {
+		jivexPasswordInline.classList.add('is-visible');
+		clearJivexPasswordInlineError();
+		if (url !== lastJivexDetectUrl) {
+			lastJivexDetectUrl = url;
+			configureJivexPasswordInline(getDefaultJivexPasswordFormat(), { resetValue: true });
+			detectJivexPasswordFormat(url);
+		}
+		return;
+	}
+
+	lastJivexDetectUrl = '';
+	jivexFormatDetectSeq += 1;
+	jivexFormatDetectPromise = null;
+	jivexPasswordInline.classList.remove('is-visible', 'is-detecting', 'is-error');
+	if (jivexPortalPasswordInput) jivexPortalPasswordInput.value = '';
+	if (jivexPasswordFormatHint) jivexPasswordFormatHint.textContent = '';
+	if (jivexPasswordInlineHint) {
+		jivexPasswordInlineHint.textContent = '';
+		jivexPasswordInlineHint.classList.remove('is-detecting', 'is-error');
+	}
 }
 
 function extractJivexCode(portalUrl) {
@@ -545,6 +830,94 @@ const MWL_TAG_PRIORITY = [
 	'0010,0040',
 	'0008,0060',
 ];
+
+function syncImportStepBackVisibility() {
+	if (!importStepBackBtn) return;
+	const show = wizardStep === 3 && !importInProgress && !importSuccessShown;
+	importStepBackBtn.hidden = !show;
+}
+
+function showImportReadyState() {
+	importSuccessShown = false;
+	if (importStepTitle) importStepTitle.textContent = t('step3ReadyTitle');
+	if (importStatusHeading) importStatusHeading.textContent = t('readyToImport');
+	if (importStatusSub) importStatusSub.textContent = t('readyToImportDesc');
+	if (importIconCloud) importIconCloud.hidden = false;
+	if (importIconSuccess) importIconSuccess.hidden = true;
+	if (importReadyActions) {
+		importReadyActions.hidden = false;
+		importReadyActions.style.display = '';
+	}
+	if (importSuccessActions) {
+		importSuccessActions.hidden = true;
+		importSuccessActions.style.display = 'none';
+	}
+	clearImportError();
+	hideImportProgressBar();
+	if (importProgressFill) importProgressFill.style.width = '0%';
+	if (importProgressText) importProgressText.textContent = '';
+	syncImportStepBackVisibility();
+}
+
+function showImportSuccessState() {
+	importSuccessShown = true;
+	if (importStepTitle) importStepTitle.textContent = t('step3StudyImport');
+	if (importStatusHeading) importStatusHeading.textContent = t('importSuccessful');
+	if (importStatusSub) importStatusSub.textContent = t('importSuccessfulDesc');
+	if (importIconCloud) importIconCloud.hidden = true;
+	if (importIconSuccess) importIconSuccess.hidden = false;
+	if (importReadyActions) {
+		importReadyActions.hidden = true;
+		importReadyActions.style.display = 'none';
+	}
+	if (importSuccessActions) {
+		importSuccessActions.hidden = false;
+		importSuccessActions.style.display = '';
+	}
+	if (importStepBackBtn) importStepBackBtn.hidden = true;
+	showImportProgressBar();
+	setImportProgress(100, '100%', t('step3StudyImport'));
+}
+
+function resetForAnotherStudy() {
+	showImportReadyState();
+	clearPatientMetadata();
+	hdscLoadedStudyUid = null;
+	if (urlInput) urlInput.value = '';
+	syncJivexPasswordField();
+	setPortalLinkScanStatus('', '');
+	updateStatus(t('statusBegin'));
+	goToWizardStep(1);
+}
+
+function handleAssignStepBack() {
+	if (assignStudyInProgress) return;
+	closeAssignStudyModal();
+	goToWizardStep(1);
+}
+
+function handleImportStepBack() {
+	if (importInProgress || importSuccessShown) return;
+	goToWizardStep(2);
+}
+
+function goToWizardStep(step) {
+	wizardStep = Math.max(1, Math.min(3, Number(step) || 1));
+	wizardStepSections.forEach((section) => {
+		const stepNumber = Number(section.dataset.wizardStep);
+		section.classList.toggle('is-active', stepNumber === wizardStep);
+	});
+	wizardRailSteps.forEach((stepEl) => {
+		const stepNumber = Number(stepEl.dataset.step);
+		stepEl.classList.toggle('is-active', stepNumber === wizardStep);
+		stepEl.classList.toggle('is-done', stepNumber < wizardStep);
+	});
+	if (wizardStep === 3 && !importInProgress && !importSuccessShown) {
+		showImportReadyState();
+	} else {
+		syncImportStepBackVisibility();
+	}
+}
 
 // Update status message
 function updateStatus(message, isError = false) {
@@ -828,72 +1201,19 @@ function scrollPatientCardIntoView() {
 	if (patientCard) patientCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function promptJivexPassword() {
-	return new Promise((resolve) => {
-		if (!jivexPasswordModal) {
-			resolve(null);
-			return;
-		}
-		if (jivexPortalPasswordInput) jivexPortalPasswordInput.value = '';
-
-		let settled = false;
-		const finish = (value) => {
-			if (settled) return;
-			settled = true;
-			closeModal(jivexPasswordModal);
-			window.electronAPI?.previewResume?.();
-			cleanup();
-			resolve(value);
-		};
-		const onContinue = () => {
-			const pass = jivexPortalPasswordInput?.value?.trim();
-			if (!pass) {
-				jivexPortalPasswordInput?.focus();
-				return;
-			}
-			finish(pass);
-		};
-		const onCancel = () => finish(null);
-		const onOverlay = (e) => {
-			if (e.target === jivexPasswordModal) onCancel();
-		};
-		const onKey = (e) => {
-			if (e.key === 'Enter') {
-				e.preventDefault();
-				onContinue();
-			}
-			if (e.key === 'Escape') onCancel();
-		};
-		function cleanup() {
-			jivexPasswordContinue?.removeEventListener('click', onContinue);
-			jivexPasswordCancel?.removeEventListener('click', onCancel);
-			jivexPasswordModal?.removeEventListener('click', onOverlay);
-			jivexPortalPasswordInput?.removeEventListener('keydown', onKey);
-		}
-
-		jivexPasswordContinue?.addEventListener('click', onContinue);
-		jivexPasswordCancel?.addEventListener('click', onCancel);
-		jivexPasswordModal?.addEventListener('click', onOverlay);
-		jivexPortalPasswordInput?.addEventListener('keydown', onKey);
-		window.electronAPI?.previewSuspend?.();
-		openModal(jivexPasswordModal);
-		setTimeout(() => jivexPortalPasswordInput?.focus(), 100);
-	});
-}
-
 // Load: download study, read DICOM metadata, optionally open web preview
 async function loadWebsite() {
 	const url = urlInput.value.trim();
 
 	if (!url) {
-		updateStatus('Please enter a URL', true);
+		updateStatus(t('statusEnterUrlRequired'), true);
 		return;
 	}
 
 	try {
 		new URL(url);
 	} catch {
-		updateStatus('Please enter a valid URL', true);
+		updateStatus(t('statusInvalidUrl'), true);
 		return;
 	}
 
@@ -901,9 +1221,24 @@ async function loadWebsite() {
 
 	const jivex = isJivexPortalUrl(url);
 	if (jivex) {
-		const password = await promptJivexPassword();
-		if (!password) return;
+		syncJivexPasswordField();
+		if (jivexFormatDetectPromise) {
+			try {
+				await jivexFormatDetectPromise;
+			} catch { /* use last known format */ }
+		}
 
+		const validation = validateJivexPasswordInput(
+			jivexPortalPasswordInput?.value,
+			jivexFormatInfo
+		);
+		if (!validation.ok) {
+			setJivexPasswordInlineError(validation.message);
+			jivexPortalPasswordInput?.focus();
+			return;
+		}
+
+		const password = validation.value;
 		loadInProgress = true;
 		setLoadButtonProgress(true);
 		clearAssignedStudyMetadata();
@@ -935,7 +1270,7 @@ async function loadWebsite() {
 
 	try {
 		const hdsc = isHdscPortalUrl(url);
-		updateStatus(hdsc ? 'Downloading from HDSC…' : 'Downloading study…');
+		updateStatus(hdsc ? t('downloadingFromHdsc') : t('downloadingStudy'));
 
 		if (hdsc && window.electronAPI?.webPreviewGetEnabled) {
 			const previewRes = await window.electronAPI.webPreviewGetEnabled();
@@ -948,7 +1283,7 @@ async function loadWebsite() {
 		scrollPatientCardIntoView();
 
 		if (hdsc) {
-			updateStatus('Study loaded from HDSC');
+			updateStatus(t('studyLoadedFromHdsc'));
 			showLoadSuccessPopup();
 			return;
 		}
@@ -957,13 +1292,13 @@ async function loadWebsite() {
 		if (window.electronAPI?.loadWebsite) {
 			const res = await window.electronAPI.loadWebsite(url);
 			if (res && res.success === false) {
-				updateStatus('Study downloaded — web preview is disabled');
+				updateStatus(t('studyDownloadedPreviewOff'));
 				togglePlaceholder(true);
 				showLoadSuccessPopup();
 				return;
 			}
 		}
-		updateStatus('Study loaded');
+		updateStatus(t('studyLoaded'));
 		showLoadSuccessPopup();
 	} catch (error) {
 		clearPatientMetadata();
@@ -1015,7 +1350,7 @@ function stopWedgeScan() {
 function startWedgeQrScan() {
 	stopWedgeScan();
 	wedgeScanActive = true;
-	setPortalLinkScanStatus('Scanning in progress…', 'scanning');
+	setPortalLinkScanStatus(t('scanningInProgress'), 'scanning');
 	if (urlInput) {
 		urlInput.value = '';
 		urlInput.focus();
@@ -1028,12 +1363,13 @@ function finalizePortalLinkScan() {
 	const normalized = normalizeScannedUrl(raw.replace(/\r?\n/g, ''));
 	wedgeScanActive = false;
 	if (!normalized) {
-		setPortalLinkScanStatus('Scanned text is not a valid URL', 'error');
+		setPortalLinkScanStatus(t('scanInvalidUrl'), 'error');
 		return false;
 	}
 	urlInput.value = normalized;
-	setPortalLinkScanStatus('Scan completed', 'completed');
-	updateStatus('Portal link ready');
+	setPortalLinkScanStatus(t('scanCompleted'), 'completed');
+	updateStatus(t('portalLinkReady'));
+	syncJivexPasswordField();
 	return true;
 }
 
@@ -1054,19 +1390,20 @@ async function handlePasteLink() {
 				const normalized = normalizeScannedUrl(text);
 				if (normalized) {
 					urlInput.value = normalized;
-					setPortalLinkScanStatus('Scan completed', 'completed');
+					setPortalLinkScanStatus(t('scanCompleted'), 'completed');
 				} else {
 					urlInput.value = text;
 					setPortalLinkScanStatus('', '');
 				}
-				updateStatus('Link pasted');
+				updateStatus(t('linkPasted'));
+				syncJivexPasswordField();
 				return;
 			}
 		}
 	} catch {
 		// fall through
 	}
-	updateStatus('Paste into the URL field (Ctrl+V)');
+	updateStatus(t('pasteIntoUrlField'));
 }
 
 if (pasteLinkBtn) {
@@ -1085,10 +1422,67 @@ urlInput.addEventListener('keydown', (e) => {
 });
 
 urlInput.addEventListener('input', () => {
-	if (!wedgeScanActive || !urlInput.value.includes('\n')) return;
-	urlInput.value = urlInput.value.replace(/\r?\n/g, '');
-	finalizePortalLinkScan();
+	if (wedgeScanActive && urlInput.value.includes('\n')) {
+		urlInput.value = urlInput.value.replace(/\r?\n/g, '');
+		finalizePortalLinkScan();
+		return;
+	}
+	syncJivexPasswordField();
 });
+
+urlInput.addEventListener('paste', () => {
+	window.setTimeout(syncJivexPasswordField, 0);
+});
+
+if (jivexPortalPasswordInput) {
+	jivexPortalPasswordInput.addEventListener('input', handleJivexPasswordInput);
+	jivexPortalPasswordInput.addEventListener('keydown', (e) => {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			loadWebsite();
+			return;
+		}
+		if (jivexFormatInfo.formatType !== 'date') return;
+		const allowed = [
+			'Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End',
+		];
+		if (allowed.includes(e.key) || e.ctrlKey || e.metaKey) return;
+		if (/^\d$/.test(e.key)) return;
+		e.preventDefault();
+	});
+	jivexPortalPasswordInput.addEventListener('paste', (e) => {
+		if (jivexFormatInfo.formatType !== 'date') return;
+		e.preventDefault();
+		const pasted = (e.clipboardData?.getData('text') || '').replace(/\D/g, '');
+		if (!pasted) return;
+		const input = jivexPortalPasswordInput;
+		const spec = getJivexDateFormatSpec(jivexFormatInfo.format);
+		const start = input.selectionStart ?? 0;
+		const end = input.selectionEnd ?? start;
+		const before = input.value.slice(0, start).replace(/\D/g, '');
+		const after = input.value.slice(end).replace(/\D/g, '');
+		const merged = (before + pasted + after).slice(0, spec.maxDigits);
+		const digitsBefore = before.length + pasted.length;
+		input.value = formatJivexDateDigits(merged, jivexFormatInfo.format);
+
+		let digitCount = 0;
+		let newPos = input.value.length;
+		for (let i = 0; i < input.value.length; i += 1) {
+			if (/\d/.test(input.value[i])) {
+				digitCount += 1;
+				if (digitCount >= digitsBefore) {
+					newPos = i + 1;
+					break;
+				}
+			}
+		}
+		input.setSelectionRange(newPos, newPos);
+		clearJivexPasswordInlineError();
+	});
+	jivexPortalPasswordInput.addEventListener('blur', () => {
+		if (jivexFormatInfo.formatType === 'date') applyJivexDatePasswordMask();
+	});
+}
 
 // Initial state (updated once web preview state is known)
 updateStatus(t('statusBegin'));
@@ -1150,7 +1544,7 @@ if (adminPreviewToggle) {
 				await window.electronAPI.webPreviewSetEnabled(!adminPreviewToggle.checked);
 			}
 		} catch {
-			updateStatus('Failed to change web preview setting', true);
+			updateStatus(t('previewSettingFailed'), true);
 		}
 	});
 }
@@ -1171,8 +1565,8 @@ function resumePreviewIfIdle() {
 		isOverlayOpen(qrModal) ||
 		isOverlayOpen(assignStudyModal) ||
 		isOverlayOpen(assignMwlTagsModal) ||
-		isOverlayOpen(jivexPasswordModal) ||
 		isOverlayOpen(operationSuccessModal) ||
+		isOverlayOpen(importLogsModal) ||
 		isOverlayOpen(languageModal) ||
 		isOverlayOpen(settingsModal) ||
 		isOverlayOpen(licenseModal)
@@ -1417,13 +1811,13 @@ adminModal.addEventListener('click', (e) => {
 async function handleGenerateQr() {
 	const url = urlInput.value.trim();
 	if (!url) {
-		updateStatus('Please enter a URL', true);
+		updateStatus(t('statusEnterUrlRequired'), true);
 		return;
 	}
 	try {
 		new URL(url);
 	} catch {
-		updateStatus('Please enter a valid URL', true);
+		updateStatus(t('statusInvalidUrl'), true);
 		return;
 	}
 
@@ -1434,7 +1828,7 @@ async function handleGenerateQr() {
 			return;
 		}
 		qrImage.src = res.dataUrl;
-		if (qrTitle) qrTitle.textContent = 'QR Code';
+		if (qrTitle) qrTitle.textContent = t('qrCode');
 		if (qrLink) {
 			qrLink.textContent = '';
 		}
@@ -1443,7 +1837,7 @@ async function handleGenerateQr() {
 		}
 		openModal(qrModal);
 	} catch {
-		updateStatus('Failed to generate QR', true);
+		updateStatus(t('qrGenerateFailed'), true);
 	}
 }
 
@@ -1453,15 +1847,45 @@ qrModal.addEventListener('click', (e) => {
 	if (e.target === qrModal) closeModal(qrModal);
 });
 
+let lastImportErrorDetail = '';
+
+function clearImportError() {
+	lastImportErrorDetail = '';
+	if (importErrorPanel) importErrorPanel.hidden = true;
+	if (importErrorSummary) importErrorSummary.textContent = '';
+}
+
+function showImportError(summary, detail = '') {
+	const message = String(summary || t('pacsSaveFailed')).trim();
+	lastImportErrorDetail = String(detail || '').trim();
+	if (importProgressFill) importProgressFill.style.width = '0%';
+	if (importStepTitle) importStepTitle.textContent = t('step3ImportFailed');
+	if (importProgressText) {
+		importProgressText.textContent = '';
+		importProgressText.classList.remove('is-error');
+	}
+	if (importErrorSummary) importErrorSummary.textContent = message;
+	if (importErrorPanel) importErrorPanel.hidden = false;
+	if (importErrorLogsBtn) importErrorLogsBtn.hidden = !lastImportErrorDetail;
+	syncImportStepBackVisibility();
+}
+
+function openImportLogsModal() {
+	if (!importLogsModal || !lastImportErrorDetail) return;
+	if (importLogsContent) importLogsContent.textContent = lastImportErrorDetail;
+	openModal(importLogsModal);
+}
+
 function setImportProgress(percent, text, title, isError = false) {
 	const pct = Math.min(100, Math.max(0, percent));
 	if (importProgressFill) importProgressFill.style.width = `${pct}%`;
 	if (importProgressText) {
 		importProgressText.textContent =
-			text || (pct >= 100 ? 'You may continue (100%)' : `You may continue (${Math.round(pct)}%)`);
+			text || (pct >= 100 ? t('importProgressContinue', { percent: 100 }) : t('importProgressContinue', { percent: Math.round(pct) }));
 		importProgressText.classList.toggle('is-error', Boolean(isError));
 	}
 	if (title && importStepTitle) importStepTitle.textContent = title;
+	if (!isError) clearImportError();
 }
 
 function showImportProgressBar() {
@@ -1490,25 +1914,17 @@ function closeOperationSuccessPopup() {
 }
 
 function showLoadSuccessPopup() {
+	goToWizardStep(2);
 	showOperationSuccessPopup({ title: t('loadSuccessTitle') });
 }
 
 function showAssignSuccessPopup() {
+	goToWizardStep(3);
 	showOperationSuccessPopup({ title: t('studyAssigned') });
 }
 
-function showPacsSuccessPopup({ filesSent = 0, patientName = '' } = {}) {
-	const n = Number(filesSent) || 0;
-	const name = patientName && String(patientName).trim();
-	const fileLabel = `${n} DICOM image${n === 1 ? '' : 's'}`;
-	const message = name
-		? `${name} — ${fileLabel} transmitted to PACS successfully.`
-		: `${fileLabel} transmitted to PACS successfully.`;
-	setImportProgress(100, 'You may continue (100%)', 'Step 3: Import complete');
-	hideImportProgressBar();
-	showOperationSuccessPopup({ title: 'Saved to PACS', message });
-	const patientCard = document.getElementById('patient-card');
-	if (patientCard) patientCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+function showPacsSuccessPopup() {
+	showImportSuccessState();
 }
 
 function resetImportUi() {
@@ -1517,8 +1933,11 @@ function resetImportUi() {
 	if (addToPacsBtn) addToPacsBtn.disabled = false;
 	if (loadBtn) loadBtn.disabled = false;
 	if (eyeBtn) eyeBtn.disabled = false;
-	showImportProgressBar();
-	setImportProgress(0, t('readyToImport'), t('step3Title'));
+	if (!importSuccessShown) {
+		clearImportError();
+		showImportProgressBar();
+		setImportProgress(0, '', t('step3ReadyTitle'));
+	}
 }
 
 const META_FIELDS = [
@@ -1952,7 +2371,7 @@ function resetAssignStudyModal() {
 	if (assignMwlStart) assignMwlStart.value = start;
 	if (assignMwlEnd) assignMwlEnd.value = end;
 	if (assignMwlSearch) assignMwlSearch.value = '';
-	setAssignMwlStatus('Set dates and click Search.');
+	setAssignMwlStatus(t('assignMwlSetDates'));
 	renderAssignMwlTable([]);
 }
 
@@ -1962,23 +2381,23 @@ function closeAssignStudyModal() {
 
 async function runAssignMwlSearch() {
 	if (!window.electronAPI?.queryMwlWorklist) {
-		setAssignMwlStatus('Worklist search not available', true);
+		setAssignMwlStatus(t('assignMwlNotAvailable'), true);
 		return;
 	}
 	const params = await resolveAssignStudyParams();
 	if (!params) {
-		setAssignMwlStatus('Set IP, port, and AE Title in Admin → Worklist Settings', true);
+		setAssignMwlStatus(t('assignMwlConfigureSettings'), true);
 		return;
 	}
 	const startDate = assignMwlStart?.value;
 	const endDate = assignMwlEnd?.value;
 	if (!startDate || !endDate) {
-		setAssignMwlStatus('Choose start and end dates', true);
+		setAssignMwlStatus(t('assignMwlChooseDates'), true);
 		return;
 	}
 
 	if (assignMwlRun) assignMwlRun.disabled = true;
-	setAssignMwlStatus('Searching worklist…');
+	setAssignMwlStatus(t('assignMwlSearching'));
 
 	try {
 		const res = await window.electronAPI.queryMwlWorklist({
@@ -1998,16 +2417,18 @@ async function runAssignMwlSearch() {
 		if (filtered.length === 0) {
 			setAssignMwlStatus(
 				assignMwlAllResults.length
-					? 'No rows match your search filter.'
-					: `No studies found (${res.dateRange || 'selected dates'}).`
+					? t('assignMwlNoFilterMatch')
+					: t('assignMwlNoStudiesInRange', { range: res.dateRange || t('assignMwlSelectedDates') })
 			);
 		} else {
 			setAssignMwlStatus(
-				`${filtered.length} stud${filtered.length === 1 ? 'y' : 'ies'} — select one, then click Assign.`
+				t(filtered.length === 1 ? 'assignMwlSelectAndAssignOne' : 'assignMwlSelectAndAssignMany', {
+					count: filtered.length,
+				})
 			);
 		}
 	} catch (e) {
-		setAssignMwlStatus(e?.message || 'Search failed', true);
+		setAssignMwlStatus(e?.message || t('assignMwlSearchFailed'), true);
 		renderAssignMwlTable([]);
 	} finally {
 		if (assignMwlRun) assignMwlRun.disabled = false;
@@ -2046,7 +2467,7 @@ async function confirmAssignMwlSelection() {
 		scrollPatientCardIntoView();
 		showAssignSuccessPopup();
 	} catch (e) {
-		updateStatus(e?.message || 'Assign study failed', true);
+		updateStatus(e?.message || t('assignStudyFailed'), true);
 	} finally {
 		assignStudyInProgress = false;
 		setAssignStudyAnimating(false);
@@ -2062,7 +2483,7 @@ async function ensureLoadBeforeAssign() {
 	if (!window.electronAPI?.getDownloadedStudy) return false;
 	const cached = await window.electronAPI.getDownloadedStudy(downloadTarget.studyUid);
 	if (!cached?.ready) {
-		updateStatus('Click Load button first', true);
+		updateStatus(t('clickLoadFirst'), true);
 		return false;
 	}
 	return true;
@@ -2103,19 +2524,20 @@ async function handleAddToPacs() {
 	if (importInProgress) return;
 	if (!window.electronAPI?.getDownloadedStudy || !window.electronAPI?.sendDicomFiles) {
 		showImportProgressBar();
-		setImportProgress(0, 'Save to PACS not available', 'Step 3: Import', true);
+		showImportError(t('pacsSaveUnavailable'), '');
 		return;
 	}
 
 	const downloadTarget = getDownloadUrlForCurrentStudy();
 	if (!downloadTarget.ok) {
 		showImportProgressBar();
-		setImportProgress(0, downloadTarget.reason, 'Step 3: Import', true);
+		showImportError(downloadTarget.reason, '');
 		return;
 	}
 
 	importInProgress = true;
 	importAborted = false;
+	if (importStepBackBtn) importStepBackBtn.hidden = true;
 	if (addToPacsBtn) addToPacsBtn.disabled = true;
 	if (assignStudyBtn) assignStudyBtn.disabled = true;
 	if (loadBtn) loadBtn.disabled = true;
@@ -2129,7 +2551,7 @@ async function handleAddToPacs() {
 		if (cached?.ready) {
 			setImportProgress(
 				25,
-				'You may continue (25%) — using study from Load / Assign',
+				t('importProgressUsingStudy', { percent: 25 }),
 				t('step3Title')
 			);
 			if (!importPatientName && cached.path && window.electronAPI.getDicomMetadataFromZip) {
@@ -2141,58 +2563,56 @@ async function handleAddToPacs() {
 			}
 		} else {
 			showImportProgressBar();
-			setImportProgress(
-				0,
-				'Click Load button first',
-				'Step 3: Import',
-				true
-			);
+			showImportError(t('clickLoadFirst'), '');
 			return;
 		}
 
-		setImportProgress(45, 'You may continue (45%) — preparing send…', t('step3Title'));
+		setImportProgress(45, t('importProgressPreparing', { percent: 45 }), t('step3Title'));
 
 		const params = await resolveSendParams();
 		if (importAborted) return;
 		if (!params) {
 			showImportProgressBar();
-			setImportProgress(45, 'Set PACS Settings in Admin, then try again', 'Step 3: Import paused', true);
+			showImportError(t('setPacsSettingsFirst'), '');
 			openSendModal();
 			return;
 		}
 
 		const sendParams = { ...params };
 		if (assignedStudyForExport) {
-			setImportProgress(55, 'You may continue (55%) — applying assigned patient metadata…', t('step3Title'));
+			setImportProgress(55, t('importProgressApplyingMetadata', { percent: 55 }), t('step3Title'));
 			sendParams.assignedMetadata = assignedStudyForExport;
 		}
 
-		setImportProgress(70, `You may continue (70%) — sending to ${params.ip}:${params.port}…`, t('step3Title'));
+		setImportProgress(70, t('importProgressSending', { percent: 70, ip: params.ip, port: params.port }), t('step3Title'));
 
 		const sendRes = await window.electronAPI.sendDicomFiles(sendParams);
 		if (importAborted) return;
 		if (!sendRes?.ok) {
 			if (handleLicenseApiError(sendRes)) throw new Error(t('licenseEnded'));
-			throw new Error(sendRes?.reason || 'Send failed');
+			showImportError(sendRes?.reason || t('pacsSaveFailed'), sendRes?.detail || '');
+			return;
 		}
 
-		const n = sendRes.filesSent || 0;
-		let patientName = importPatientName;
-		if (!patientName && metaPatientName && !metaPatientName.classList.contains('meta-missing')) {
-			patientName = metaPatientName.textContent?.trim() || '';
-		}
-		showPacsSuccessPopup({ filesSent: n, patientName });
+		clearImportError();
+
+		showPacsSuccessPopup();
 	} catch (e) {
 		if (!importAborted) {
 			showImportProgressBar();
-			setImportProgress(0, e?.message || 'Import failed', 'Step 3: Import failed', true);
+			if (e?.message === t('licenseEnded')) {
+				showImportError(t('licenseEnded'), '');
+			} else {
+				showImportError(e?.message || t('pacsSaveFailed'), e?.detail || '');
+			}
 		}
 	} finally {
 		importInProgress = false;
-		if (addToPacsBtn) addToPacsBtn.disabled = false;
+		if (addToPacsBtn && !importSuccessShown) addToPacsBtn.disabled = false;
 		if (assignStudyBtn) assignStudyBtn.disabled = false;
 		if (loadBtn) loadBtn.disabled = false;
 		if (eyeBtn) eyeBtn.disabled = false;
+		if (!importSuccessShown) syncImportStepBackVisibility();
 	}
 }
 
@@ -2218,9 +2638,9 @@ if (assignMwlSearch) {
 		const filtered = filterMwlResults(assignMwlAllResults, assignMwlSearch.value);
 		renderAssignMwlTable(filtered);
 		if (filtered.length) {
-			setAssignMwlStatus(`${filtered.length} stud${filtered.length === 1 ? 'y' : 'ies'} — select one.`);
+			setAssignMwlStatus(t(filtered.length === 1 ? 'assignMwlSelectOne' : 'assignMwlSelectMany', { count: filtered.length }));
 		} else if (assignMwlAllResults.length) {
-			setAssignMwlStatus('No rows match your search filter.');
+			setAssignMwlStatus(t('assignMwlNoFilterMatch'));
 		}
 	});
 }
@@ -2234,6 +2654,18 @@ if (addToPacsBtn) {
 }
 if (operationSuccessOk) {
 	operationSuccessOk.addEventListener('click', closeOperationSuccessPopup);
+}
+
+if (importErrorLogsBtn) {
+	importErrorLogsBtn.addEventListener('click', openImportLogsModal);
+}
+if (importLogsClose) {
+	importLogsClose.addEventListener('click', () => closeModal(importLogsModal));
+}
+if (importLogsModal) {
+	importLogsModal.addEventListener('click', (e) => {
+		if (e.target === importLogsModal) closeModal(importLogsModal);
+	});
 }
 if (operationSuccessModal) {
 	operationSuccessModal.addEventListener('click', (e) => {
@@ -2254,7 +2686,7 @@ async function handleGenerateDownloadQr() {
 			return;
 		}
 		qrImage.src = res.dataUrl;
-		if (qrTitle) qrTitle.textContent = 'Download QR/Link';
+		if (qrTitle) qrTitle.textContent = t('downloadQrLinkTitle');
 		if (qrLink) {
 			qrLink.textContent = downloadTarget.url;
 		}
@@ -2263,7 +2695,7 @@ async function handleGenerateDownloadQr() {
 		}
 		openModal(qrModal);
 	} catch {
-		updateStatus('Failed to generate download QR', true);
+		updateStatus(t('downloadQrFailed'), true);
 	}
 }
 
@@ -2276,9 +2708,9 @@ if (copyDownloadLinkBtn) {
 		}
 		try {
 			await window.electronAPI.copyToClipboard(downloadTarget.url);
-			updateStatus('Download link copied');
+			updateStatus(t('downloadLinkCopied'));
 		} catch {
-			updateStatus('Failed to copy download link', true);
+			updateStatus(t('downloadLinkCopyFailed'), true);
 		}
 	});
 }
@@ -2313,16 +2745,16 @@ savePacsBtn.addEventListener('click', async () => {
 
 	// For now, just show a status message. Later we can persist.
 	if (!node || !ip || !port || !ae) {
-		updateStatus('Please fill all PACS fields', true);
+		updateStatus(t('fillAllPacsFields'), true);
 		return;
 	}
 
 	try {
 		await window.electronAPI.savePacs({ node, ip, port, ae });
-		updateStatus(`Saved PACS: ${node} (${ip}:${port}) AE=${ae}`);
+		updateStatus(t('pacsSaved', { node, ip, port, ae }), false);
 		closePacsModal();
 	} catch (e) {
-		updateStatus('Failed to save PACS', true);
+		updateStatus(t('pacsSaveFailedShort'), true);
 	}
 });
 
@@ -2330,13 +2762,13 @@ showExistingBtn.addEventListener('click', async () => {
 	try {
 		const records = await window.electronAPI.listPacs();
 		if (!records || records.length === 0) {
-			updateStatus('Existing PACS: (none yet)');
+			updateStatus(t('pacsNoneYet'));
 			return;
 		}
 		const summary = records.map(r => `${r.node} (${r.ip}:${r.port}) AE=${r.ae}`).join(' | ');
-		updateStatus(`Existing PACS: ${summary}`);
+		updateStatus(t('pacsExistingSummary', { summary }), false);
 	} catch (e) {
-		updateStatus('Failed to read PACS', true);
+		updateStatus(t('pacsReadFailed'), true);
 	}
 });
 
@@ -2416,19 +2848,19 @@ function startEditPacs(id) {
 			ae: aeTd.querySelector('input').value.trim(),
 		};
 		if (!updated.node || !updated.ip || !updated.port || !updated.ae) {
-			updateStatus('Please fill all fields to save PACS', true);
+			updateStatus(t('fillAllPacsFieldsSave'), true);
 			return;
 		}
 		try {
 			const res = await window.electronAPI.updatePacs(updated);
 			if (res && res.ok) {
-				updateStatus('PACS updated');
+				updateStatus(t('pacsUpdated'));
 				refreshPacsList();
 			} else {
-				updateStatus('Failed to update PACS', true);
+				updateStatus(t('pacsUpdateFailed'), true);
 			}
 		} catch {
-			updateStatus('Failed to update PACS', true);
+			updateStatus(t('pacsUpdateFailed'), true);
 		}
 	});
 
@@ -2495,7 +2927,7 @@ function closeAssignStudySettingsModal() {
 }
 
 async function sendDicom(params) {
-	updateStatus('Sending DICOM files...');
+	updateStatus(t('sendingDicom'));
 	const res = await window.electronAPI.sendDicomFiles(params);
 	if (res && res.ok) {
 		updateStatus(`Sent ${res.filesSent || 0} DICOM files successfully`);
@@ -2505,7 +2937,8 @@ async function sendDicom(params) {
 		updateStatus(t('licenseEnded'), true);
 		return false;
 	}
-	updateStatus(res && res.reason ? res.reason : 'Failed to send files', true);
+	updateStatus(res?.reason || t('pacsSaveFailed'), true);
+	if (res?.detail) showImportError(res.reason || t('pacsSaveFailed'), res.detail);
 	return false;
 }
 
@@ -2526,19 +2959,19 @@ if (assignStudySettingsSave) {
 		const port = assignStudySettingsPort?.value.trim() || '';
 		const aeTitle = assignStudySettingsAe?.value.trim() || '';
 		if (!ip || !port || !aeTitle) {
-			updateStatus('Please fill all assign study settings fields', true);
+			updateStatus(t('fillAllAssignSettings'), true);
 			return;
 		}
 		try {
 			const res = await window.electronAPI.saveAssignStudySettings({ ip, port, aeTitle });
 			if (res?.ok) {
-				updateStatus('Worklist settings saved');
+				updateStatus(t('assignSettingsSaved'));
 				closeAssignStudySettingsModal();
 			} else {
 				updateStatus(res?.reason || 'Failed to save assign study settings', true);
 			}
 		} catch {
-			updateStatus('Failed to save assign study settings', true);
+			updateStatus(t('assignSettingsSaveFailed'), true);
 		}
 	});
 }
@@ -2551,6 +2984,55 @@ if (sendSettingsModal) {
 	});
 }
 clearPatientMetadata();
+goToWizardStep(1);
+
+const wizardCard = document.querySelector('.wizard-card');
+if (wizardCard) {
+	wizardCard.addEventListener('click', (e) => {
+		if (e.target.closest('#assign-step-back-btn')) {
+			e.preventDefault();
+			handleAssignStepBack();
+			return;
+		}
+		if (e.target.closest('#import-step-back-btn')) {
+			e.preventDefault();
+			handleImportStepBack();
+		}
+	});
+}
+
+if (assignStepBackBtn) {
+	assignStepBackBtn.addEventListener('click', (e) => {
+		e.preventDefault();
+		handleAssignStepBack();
+	});
+}
+
+if (importStepBackBtn) {
+	importStepBackBtn.addEventListener('click', (e) => {
+		e.preventDefault();
+		handleImportStepBack();
+	});
+}
+
+if (importDoneBtn) {
+	importDoneBtn.addEventListener('click', () => {
+		window.electronAPI?.quitApp?.();
+	});
+}
+
+if (importAnotherBtn) {
+	importAnotherBtn.addEventListener('click', () => {
+		resetForAnotherStudy();
+	});
+}
+
+if (skipAssignBtn) {
+	skipAssignBtn.addEventListener('click', () => {
+		if (assignStudyInProgress || importInProgress || loadInProgress) return;
+		goToWizardStep(3);
+	});
+}
 
 if (sendSettingsSave) {
 	sendSettingsSave.addEventListener('click', async () => {
@@ -2558,19 +3040,19 @@ if (sendSettingsSave) {
 		const port = sendSettingsPort.value.trim();
 		const aeTitle = sendSettingsAe.value.trim();
 		if (!ip || !port || !aeTitle) {
-			updateStatus('Please fill all send settings fields', true);
+			updateStatus(t('fillAllSendSettings'), true);
 			return;
 		}
 		try {
 			const res = await window.electronAPI.saveSendSettings({ ip, port, aeTitle });
 			if (res && res.ok) {
-				updateStatus('PACS settings saved');
+				updateStatus(t('sendSettingsSaved'));
 				closeSendSettingsModal();
 			} else {
 				updateStatus(res?.reason || 'Failed to save send settings', true);
 			}
 		} catch {
-			updateStatus('Failed to save send settings', true);
+			updateStatus(t('sendSettingsSaveFailed'), true);
 		}
 	});
 }
@@ -2588,7 +3070,7 @@ if (sendSubmit) {
 		const port = document.getElementById('send-port').value.trim();
 		const ae = document.getElementById('send-ae').value.trim();
 		if (!ip || !port || !ae) {
-			updateStatus('Please fill all send fields', true);
+			updateStatus(t('fillAllSendFields'), true);
 			return;
 		}
 		const ok = await sendDicom({ aeTitle: ae, port, ip });
@@ -2628,7 +3110,7 @@ if (settingsPreviewToggle) {
 				await window.electronAPI.previewSuspend();
 			}
 		} catch {
-			updateStatus('Failed to change web preview setting', true);
+			updateStatus(t('previewSettingFailed'), true);
 			settingsPreviewToggle.checked = !wantEnabled;
 		}
 	});

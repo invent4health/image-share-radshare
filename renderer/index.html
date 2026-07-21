@@ -12,6 +12,20 @@
       rel="stylesheet"
     />
     <style>
+      :root {
+        --brand-primary: #3182ce;
+        --brand-primary-hover: #2b6cb0;
+        --brand-primary-light: #4299e1;
+        --brand-primary-soft: #ebf4fa;
+        --brand-primary-border: #bee3f8;
+        --brand-focus: #90cdf4;
+        --brand-text: #1a2e2b;
+        --brand-heading: #2c5282;
+        --brand-muted: #5f6368;
+        --brand-surface: #f8f9fa;
+        --brand-border: #e8eaed;
+      }
+
       * {
         margin: 0;
         padding: 0;
@@ -28,7 +42,7 @@
       }
 
       body {
-        background: #eef1f0;
+        background: #f0f2f5;
         height: 100vh;
         overflow: hidden;
       }
@@ -47,39 +61,35 @@
 
       .container.preview-disabled {
         justify-content: center;
-        align-items: flex-start;
-        padding-top: 22px;
-        padding-bottom: 12px;
-        background: #eef1f0;
+        align-items: stretch;
+        padding: 0;
+        background: #f0f2f5;
+        max-width: none;
       }
 
       .container.preview-disabled .left-panel {
-        width: 380px;
-        max-width: 380px;
-        flex: 0 0 auto;
-        height: auto;
-        max-height: calc(100vh - 40px);
-        align-self: auto;
-        border: 1px solid #d8e0dd;
-        border-radius: 12px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        width: 480px;
+        max-width: 480px;
+        flex: 0 0 480px;
+        height: 100vh;
+        max-height: 100vh;
+        margin: 0 auto;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
         overflow: hidden;
       }
 
-      .container.preview-disabled .menu-shell {
-        flex: 0 1 auto;
-        padding-bottom: 8px;
-      }
-
       .left-panel {
-        width: 380px;
-        max-width: 380px;
-        flex: 0 0 380px;
-        background: #f7f9f8;
-        border-right: 1px solid #e0e0e0;
+        width: 480px;
+        max-width: 480px;
+        flex: 0 0 480px;
+        background: #fff;
+        border-right: 1px solid #e8eaed;
         padding: 0;
         display: flex;
         flex-direction: column;
+        height: 100vh;
         overflow: hidden;
       }
 
@@ -88,9 +98,9 @@
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        padding: 10px 18px 10px;
-        border-bottom: 1px solid #e3ebe7;
-        background: #f7f9f8;
+        padding: 14px 18px;
+        border-bottom: 1px solid #e8eaed;
+        background: #fff;
         flex-shrink: 0;
       }
 
@@ -118,47 +128,224 @@
 
       .app-brand-footer {
         flex-shrink: 0;
-        padding: 8px 18px 8px;
-        border-top: 1px solid #e3ebe7;
+        margin-top: auto;
+        padding: 12px 18px 14px;
+        border-top: 1px solid #e8eaed;
         text-align: center;
         font-size: 11px;
         color: #7a8a85;
         line-height: 1.4;
-        background: #f7f9f8;
+        background: #fff;
+      }
+
+      .wizard-layout {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        overflow: hidden;
+        background: #fff;
+      }
+
+      .wizard-rail {
+        flex: 0 0 72px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px 0 16px;
+        background: #fafbfc;
+        border-right: 1px solid #eef0f2;
+      }
+
+      .wizard-rail-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+
+      .wizard-rail-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: 2px solid #d8dee8;
+        background: #fff;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+      }
+
+      .wizard-rail-icon svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .wizard-rail-num {
+        font-size: 12px;
+        font-weight: 600;
+        color: #94a3b8;
+        line-height: 1;
+      }
+
+      .wizard-rail-step.is-active .wizard-rail-icon {
+        background: var(--brand-primary);
+        border-color: var(--brand-primary);
+        color: #fff;
+      }
+
+      .wizard-rail-step.is-active .wizard-rail-num {
+        color: var(--brand-heading);
+      }
+
+      .wizard-rail-step.is-done .wizard-rail-icon {
+        background: var(--brand-primary-soft);
+        border-color: var(--brand-primary-border);
+        color: var(--brand-primary);
+      }
+
+      .wizard-rail-step.is-done .wizard-rail-num {
+        color: var(--brand-primary);
+      }
+
+      .wizard-rail-line {
+        width: 0;
+        flex: 1;
+        min-height: 28px;
+        border-left: 2px dashed #d8dee8;
+        margin: 6px 0;
+      }
+
+      .wizard-main {
+        flex: 1;
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 16px 16px 8px 12px;
+      }
+
+      .wizard-card {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #e8eaed;
+        border-radius: 12px;
+        background: #fff;
+        padding: 18px 18px 16px;
+        overflow: visible;
       }
 
       .menu-shell {
         flex: 1;
+        min-height: 0;
+        min-width: 0;
         overflow-y: auto;
-        padding: 8px 18px 16px;
+        overflow-x: visible;
         display: flex;
         flex-direction: column;
-        gap: 0;
+        padding-inline: 2px;
+        margin-inline: -2px;
       }
 
       .menu-step {
-        padding: 16px 0;
-        border-bottom: 1px solid #e3ebe7;
+        display: none;
+        flex: 1;
+        flex-direction: column;
+        min-height: 0;
       }
 
-      .menu-step:first-child {
-        padding-top: 6px;
-      }
-
-      .menu-step:first-child .step-title {
-        margin-top: 0;
-      }
-
-      .menu-step:last-of-type {
-        border-bottom: none;
+      .menu-step.is-active {
+        display: flex;
       }
 
       .step-title {
-        font-size: 15px;
-        font-weight: 600;
-        color: #1a2e2b;
-        margin-bottom: 12px;
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--brand-heading);
+        margin-bottom: 16px;
         line-height: 1.35;
+      }
+
+      .step-body {
+        flex: 1;
+        min-height: 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .step-footer-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: auto;
+        padding-top: 12px;
+        flex-shrink: 0;
+      }
+
+      .step-footer-actions .import-step-back-btn {
+        align-self: flex-start;
+        margin-top: -6px;
+        position: relative;
+        z-index: 2;
+      }
+
+      .button-outline-brand {
+        background: #fff;
+        color: var(--brand-primary);
+        border: 1.5px solid var(--brand-primary);
+      }
+
+      .button-outline-brand:hover {
+        background: var(--brand-primary-soft);
+      }
+
+      .import-hero-icon-wrap {
+        width: 88px;
+        height: 88px;
+        border-radius: 50%;
+        background: var(--brand-primary-soft);
+        color: var(--brand-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 8px auto 16px;
+        flex-shrink: 0;
+      }
+
+      .import-hero-icon-wrap svg {
+        width: 40px;
+        height: 40px;
+      }
+
+      .import-hero-icon-wrap svg[hidden] {
+        display: none;
+      }
+
+      .import-status-heading {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1a2e2b;
+        text-align: center;
+        margin-bottom: 6px;
+      }
+
+      .import-status-sub {
+        font-size: 13px;
+        color: #5a6b66;
+        text-align: center;
+        line-height: 1.45;
+        margin-bottom: 16px;
+      }
+
+      .import-step-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
       }
 
       .step-actions-row {
@@ -172,6 +359,7 @@
         display: flex;
         flex-direction: column;
         gap: 6px;
+        min-width: 0;
       }
 
       .input-group label {
@@ -181,8 +369,13 @@
       }
 
       .input-group input {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
         padding: 10px 12px;
-        border: 1px solid #d0ddd8;
+        border: 1px solid #dadce0;
         border-radius: 10px;
         font-size: 13px;
         background: #fff;
@@ -190,8 +383,9 @@
       }
 
       .input-group input:focus {
-        outline: 2px solid #c4dacd;
-        border-color: #b8cfc6;
+        outline: none;
+        border: 2px solid #63b3ed;
+        padding: 9px 11px;
       }
 
       .portal-link-scan-status {
@@ -206,12 +400,12 @@
       }
 
       .portal-link-scan-status.is-scanning {
-        color: #005450;
+        color: #3182ce;
         font-weight: 500;
       }
 
       .portal-link-scan-status.is-completed {
-        color: #0d7a71;
+        color: #4299e1;
         font-weight: 500;
       }
 
@@ -221,6 +415,99 @@
 
       .portal-link-group {
         gap: 4px;
+        min-width: 0;
+      }
+
+      .jivex-password-inline {
+        overflow: hidden;
+        max-height: 0;
+        opacity: 0;
+        transform: translateY(-8px);
+        margin-top: 0;
+        pointer-events: none;
+        transition:
+          max-height 0.42s cubic-bezier(0.4, 0, 0.2, 1),
+          opacity 0.32s ease,
+          transform 0.32s ease,
+          margin-top 0.32s ease;
+      }
+
+      .jivex-password-inline.is-visible {
+        max-height: 200px;
+        opacity: 1;
+        transform: translateY(0);
+        margin-top: 10px;
+        pointer-events: auto;
+      }
+
+      .jivex-password-inline.is-detecting .jivex-inline-password {
+        background-image: linear-gradient(
+          90deg,
+          #fff 0%,
+          var(--brand-primary-soft) 50%,
+          #fff 100%
+        );
+        background-size: 200% 100%;
+        animation: jivex-field-shimmer 1.2s ease-in-out infinite;
+      }
+
+      @keyframes jivex-field-shimmer {
+        0% {
+          background-position: 100% 0;
+        }
+        100% {
+          background-position: -100% 0;
+        }
+      }
+
+      @keyframes jivex-shake {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        20%,
+        60% {
+          transform: translateX(-5px);
+        }
+        40%,
+        80% {
+          transform: translateX(5px);
+        }
+      }
+
+      .jivex-password-inline.is-error {
+        animation: jivex-shake 0.4s ease;
+      }
+
+      .jivex-password-format-hint {
+        font-size: 12px;
+        line-height: 1.4;
+        color: #5a6b66;
+        margin: 6px 0 0;
+      }
+
+      .jivex-password-format-hint:empty {
+        display: none;
+      }
+
+      .jivex-password-inline-hint {
+        font-size: 12px;
+        line-height: 1.35;
+        color: #5a6b66;
+        margin: 4px 0 0;
+        min-height: 0;
+      }
+
+      .jivex-password-inline-hint:empty {
+        display: none;
+      }
+
+      .jivex-password-inline-hint.is-error {
+        color: #c62828;
+      }
+
+      .jivex-password-inline-hint.is-detecting {
+        color: var(--brand-primary);
       }
 
       .load-portal-btn {
@@ -235,11 +522,11 @@
       }
 
       .button {
-        background: #005450;
+        background: var(--brand-primary);
         color: white;
         border: none;
-        padding: 11px 16px;
-        border-radius: 10px;
+        padding: 12px 16px;
+        border-radius: 8px;
         font-size: 13px;
         font-weight: 600;
         cursor: pointer;
@@ -249,16 +536,28 @@
       }
 
       .button:hover {
-        background: #003f3a;
+        background: var(--brand-primary-hover);
+      }
+
+      .button.button-skip-muted {
+        background: var(--brand-primary-light);
+        color: #fff;
+        border: none;
+        font-weight: 600;
+      }
+
+      .button.button-skip-muted:hover {
+        background: var(--brand-primary);
+        color: #fff;
       }
 
       .button:disabled {
-        background: #b5c4bf;
+        background: #9aa0a6;
         cursor: not-allowed;
       }
 
       .button.is-downloading:disabled {
-        background: #005450 !important;
+        background: #3182ce !important;
         color: #fff !important;
         cursor: wait;
         opacity: 1;
@@ -301,11 +600,11 @@
       .button-outline {
         background: #fff;
         color: #1a2e2b;
-        border: 1px solid #c8d6d1;
+        border: 1px solid #dadce0;
       }
 
       .button-outline:hover {
-        background: #f0f5f3;
+        background: var(--brand-primary-soft);
       }
 
       #import-progress-wrap.is-hidden {
@@ -314,7 +613,7 @@
 
       .import-step .progress-track {
         height: 10px;
-        background: #e8eeeb;
+        background: var(--brand-primary-soft);
         border-radius: 999px;
         overflow: hidden;
         margin: 10px 0 8px;
@@ -323,33 +622,77 @@
       .import-step .progress-fill {
         height: 100%;
         width: 0%;
-        background: linear-gradient(90deg, #005450 0%, #0d7a71 100%);
+        background: linear-gradient(90deg, #3182ce 0%, #4299e1 100%);
         border-radius: 999px;
         transition: width 0.4s ease;
       }
 
       .import-progress-text {
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 500;
-        color: #1a2e2b;
-        margin-bottom: 10px;
+        color: #5a6b66;
+        text-align: center;
+        margin-bottom: 4px;
       }
 
       .import-actions {
         display: flex;
         flex-direction: column;
-        gap: 8px;
-        margin-top: 14px;
+        gap: 2px;
+        margin-top: auto;
+        padding-top: 12px;
       }
 
-      .patient-card {
-        background: #f7f9f8;
-        border: 1px solid #e3ebe7;
-        border-radius: 10px;
-        padding: 12px 14px;
+      .import-actions[hidden] {
+        display: none !important;
+      }
+
+      .import-step-back-btn {
+        align-self: flex-start;
+        width: auto;
+        min-width: 0;
+        padding: 8px 4px 0 0;
+        background: transparent;
+        color: var(--brand-heading);
+        font-size: 15px;
+        font-weight: 500;
+        border: none;
+        cursor: pointer;
+        position: relative;
+        z-index: 2;
+      }
+
+      .import-step-back-btn:hover {
+        background: transparent;
+        color: var(--brand-primary);
+        text-decoration: underline;
+      }
+
+      .import-step-back-btn[hidden] {
+        display: none;
+      }
+
+      .import-success-actions {
         display: flex;
         flex-direction: column;
         gap: 10px;
+        margin-top: auto;
+        padding-top: 12px;
+      }
+
+      .import-success-actions[hidden] {
+        display: none;
+      }
+
+      .patient-card {
+        background: #fff;
+        border: 1px solid #e8eaed;
+        border-radius: 10px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        flex: 1;
       }
 
       .patient-card-row {
@@ -388,11 +731,10 @@
 
       .assign-study-btn {
         width: 100%;
-        margin-top: 10px;
       }
 
       .assign-study-btn.is-assigning {
-        background: #005450 !important;
+        background: #3182ce !important;
         color: #fff !important;
         cursor: wait;
       }
@@ -405,8 +747,54 @@
         display: none;
       }
 
+      .import-progress-text:empty {
+        display: none;
+      }
+
       .import-progress-text.is-error {
         color: #c62828;
+        font-weight: 600;
+      }
+
+      .import-error-panel {
+        margin-top: 10px;
+        text-align: center;
+      }
+
+      .import-error-panel[hidden] {
+        display: none;
+      }
+
+      .import-error-summary {
+        font-size: 13px;
+        font-weight: 600;
+        color: #c62828;
+        line-height: 1.45;
+        margin: 0 0 10px;
+      }
+
+      .import-error-logs-btn {
+        width: auto;
+        min-width: 120px;
+        margin: 0 auto;
+        padding: 8px 16px;
+        font-size: 12px;
+      }
+
+      .import-logs-content {
+        margin: 0;
+        padding: 12px;
+        max-height: 50vh;
+        overflow: auto;
+        background: #f8f9fa;
+        border: 1px solid #e8eaed;
+        border-radius: 8px;
+        font-size: 11px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #3c4043;
+        text-align: left;
       }
 
       .right-panel {
@@ -509,7 +897,7 @@
       .downloads-item-bar {
         height: 100%;
         width: 0%;
-        background: #1a73e8;
+        background: #3182ce;
         border-radius: 999px;
         transition: width 180ms ease;
       }
@@ -520,7 +908,7 @@
       }
 
       .downloads-item-bar.is-complete {
-        background: #188038;
+        background: #3182ce;
         width: 100% !important;
       }
 
@@ -577,10 +965,6 @@
         z-index: 1180;
       }
 
-      #jivex-password-modal.modal-overlay {
-        z-index: 1250;
-      }
-
       #assign-mwl-tags-modal.modal-overlay {
         z-index: 1190;
       }
@@ -609,23 +993,23 @@
       .assign-mwl-tags-search-row input {
         width: 100%;
         padding: 10px 12px;
-        border: 2px solid #d6e5df;
+        border: 2px solid #d2e3fc;
         border-radius: 8px;
         font-size: 14px;
         box-sizing: border-box;
       }
 
       .assign-mwl-tags-search-row input:focus {
-        outline: 2px solid #c4dacd;
-        border-color: #c4dacd;
+        outline: 2px solid #90cdf4;
+        border-color: #90cdf4;
       }
 
       .assign-mwl-tags-wrap {
         max-height: 55vh;
         overflow: auto;
-        border: 1px solid #d6e5df;
+        border: 1px solid #d2e3fc;
         border-radius: 10px;
-        background: #fafcfb;
+        background: #f8f9fa;
       }
 
       .assign-mwl-tags-table {
@@ -645,7 +1029,7 @@
       .assign-mwl-tags-table th {
         position: sticky;
         top: 0;
-        background: #f0f5f3;
+        background: var(--brand-primary-soft);
         font-family: inherit;
         font-weight: 600;
         color: #1a2e2b;
@@ -654,7 +1038,7 @@
 
       .assign-mwl-tags-table td.tag-col {
         white-space: nowrap;
-        color: #005450;
+        color: #3182ce;
       }
 
       .assign-mwl-tags-table td.name-col {
@@ -666,7 +1050,7 @@
       }
 
       .assign-mwl-tags-table tbody tr.is-priority {
-        background: #eef6f3;
+        background: var(--brand-primary-soft);
       }
 
       .assign-mwl-tags-table tbody tr.is-priority td.name-col {
@@ -707,7 +1091,7 @@
         width: 100%;
         min-width: 0;
         padding: 10px 12px;
-        border: 2px solid #d6e5df;
+        border: 2px solid #d2e3fc;
         border-radius: 8px;
         font-size: 14px;
         box-sizing: border-box;
@@ -742,9 +1126,9 @@
       .assign-mwl-table-wrap {
         max-height: 320px;
         overflow: auto;
-        border: 1px solid #d6e5df;
+        border: 1px solid #d2e3fc;
         border-radius: 10px;
-        background: #fafcfb;
+        background: #f8f9fa;
       }
 
       .assign-mwl-table {
@@ -763,7 +1147,7 @@
       .assign-mwl-table th {
         position: sticky;
         top: 0;
-        background: #f0f5f3;
+        background: var(--brand-primary-soft);
         font-weight: 600;
         color: #1a2e2b;
         z-index: 1;
@@ -774,11 +1158,11 @@
       }
 
       .assign-mwl-table tbody tr:hover {
-        background: #edf5f2;
+        background: var(--brand-primary-soft);
       }
 
       .assign-mwl-table tbody tr.is-selected {
-        background: #d9ebe6;
+        background: #c2d7f9;
       }
 
       .assign-mwl-empty {
@@ -790,7 +1174,7 @@
 
       #operation-success-modal.modal-overlay {
         z-index: 1250;
-        background: rgba(22, 38, 36, 0.48);
+        background: rgba(32, 33, 36, 0.48);
         backdrop-filter: blur(5px);
       }
 
@@ -814,7 +1198,7 @@
         max-width: calc(100vw - 32px);
         text-align: center;
         padding: 32px 28px 24px;
-        border: 1px solid rgba(0, 84, 80, 0.1);
+        border: 1px solid rgba(26, 115, 232, 0.1);
       }
 
       .success-modal-icon {
@@ -822,12 +1206,12 @@
         height: 60px;
         margin: 0 auto 18px;
         border-radius: 50%;
-        background: linear-gradient(145deg, #0d8a80 0%, #005450 100%);
+        background: linear-gradient(145deg, #4299e1 0%, #3182ce 100%);
         color: #fff;
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 10px 28px rgba(0, 84, 80, 0.32);
+        box-shadow: 0 10px 28px rgba(26, 115, 232, 0.32);
       }
 
       .success-modal-icon svg {
@@ -887,11 +1271,11 @@
 
       .modal-header {
         padding: 16px 20px;
-        border-bottom: 1px solid #eef2f0;
+        border-bottom: 1px solid #e8eaed;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        background: #f9fbfa;
+        background: #f8f9fa;
       }
 
       .modal-header .button {
@@ -904,7 +1288,7 @@
       .modal-title {
         font-size: 18px;
         font-weight: 700;
-        color: #1f3b34;
+        color: #2c5282;
       }
 
       .modal-body {
@@ -932,14 +1316,14 @@
         min-width: 0;
         max-width: 100%;
         padding: 10px 12px;
-        border: 2px solid #d6e5df;
+        border: 2px solid #d2e3fc;
         border-radius: 8px;
         font-size: 14px;
       }
 
       .modal-body input:focus {
-        outline: 2px solid #c4dacd;
-        border-color: #c4dacd;
+        outline: 2px solid #90cdf4;
+        border-color: #90cdf4;
       }
 
       .modal-footer {
@@ -947,8 +1331,8 @@
         display: flex;
         gap: 10px;
         justify-content: flex-end;
-        background: #fafcfb;
-        border-top: 1px solid #eef2f0;
+        background: #f8f9fa;
+        border-top: 1px solid #e8eaed;
       }
 
       .btn-secondary {
@@ -971,7 +1355,7 @@
         color: #8a3f38;
       }
 
-      /* PACS table styles with green tones (cleaner spacing) */
+      /* PACS table styles */
       .pacs-table {
         border-radius: 10px;
         overflow: hidden;
@@ -979,30 +1363,30 @@
       .pacs-table th {
         text-align: left;
         padding: 12px 10px;
-        background: #e7f1ec;
-        color: #16483f;
-        border-bottom: 2px solid #c9dfd6;
+        background: var(--brand-primary-soft);
+        color: #2c5282;
+        border-bottom: 2px solid #c2d7f9;
         font-weight: 600;
       }
       .pacs-table td {
         padding: 10px 10px;
-        border-bottom: 1px solid #e9f2ee;
+        border-bottom: 1px solid #e8eaed;
         vertical-align: middle;
       }
       .pacs-table tr {
         transition: background-color 180ms ease, transform 180ms ease;
       }
       .pacs-table tr.editing {
-        background: #eef8f3;
+        background: var(--brand-primary-soft);
       }
       .pacs-table tr.editing td {
-        background: #eef8f3;
+        background: var(--brand-primary-soft);
       }
       .pacs-table tr:nth-child(even) td {
-        background: #f6fbf9;
+        background: #f8f9fa;
       }
       .pacs-table tr:hover td {
-        background: #edf7f3;
+        background: var(--brand-primary-soft);
       }
       .pacs-table td:last-child {
         width: 140px;
@@ -1015,14 +1399,14 @@
       .pacs-table input {
         width: 100%;
         padding: 8px 10px;
-        border: 2px solid #d6e5df;
+        border: 2px solid #d2e3fc;
         border-radius: 8px;
         font-size: 14px;
         background: #ffffff;
       }
       .pacs-table input:focus {
-        outline: 2px solid #c4dacd;
-        border-color: #c4dacd;
+        outline: 2px solid #90cdf4;
+        border-color: #90cdf4;
       }
       .btn-sm {
         padding: 8px 14px;
@@ -1058,12 +1442,12 @@
         min-width: 160px;
         background: #fff;
         color: #1a2e2b;
-        border: 1px solid #c8d6d1;
+        border: 1px solid #dadce0;
         padding: 10px 28px;
       }
 
       #admin-done:hover {
-        background: #f0f5f3;
+        background: var(--brand-primary-soft);
       }
 
       .admin-row {
@@ -1072,9 +1456,9 @@
         justify-content: space-between;
         gap: 12px;
         padding: 10px 12px;
-        border: 1px solid #e8eeeb;
+        border: 1px solid #e8f0fe;
         border-radius: 10px;
-        background: #fbfdfc;
+        background: #f8f9fa;
       }
 
       .admin-row .label {
@@ -1085,7 +1469,7 @@
 
       .admin-row .label .title {
         font-weight: 600;
-        color: #1f3b34;
+        color: #2c5282;
         font-size: 14px;
       }
 
@@ -1127,7 +1511,7 @@
       }
 
       .toggle input:checked {
-        background: #005450;
+        background: #3182ce;
       }
 
       .toggle input:checked::after {
@@ -1135,7 +1519,7 @@
       }
 
       .toggle input:focus {
-        outline: 2px solid #c4dacd;
+        outline: 2px solid #90cdf4;
       }
 
       .qr-wrap {
@@ -1152,7 +1536,7 @@
         width: 280px;
         height: 280px;
         border-radius: 12px;
-        border: 1px solid #e8eeeb;
+        border: 1px solid #e8f0fe;
         background: #ffffff;
         display: block;
       }
@@ -1219,7 +1603,7 @@
 
       .auth-field input {
         padding: 10px 12px;
-        border: 2px solid #d6e5df;
+        border: 2px solid #d2e3fc;
         border-radius: 8px;
         font-size: 14px;
         width: 100%;
@@ -1227,8 +1611,8 @@
       }
 
       .auth-field input:focus {
-        outline: 2px solid #c4dacd;
-        border-color: #c4dacd;
+        outline: 2px solid #90cdf4;
+        border-color: #90cdf4;
       }
 
       .eye-btn {
@@ -1239,22 +1623,22 @@
         height: 30px;
         width: 34px;
         border-radius: 8px;
-        border: 1px solid #d6e5df;
-        background: #f6fbf9;
+        border: 1px solid #d2e3fc;
+        background: #f8f9fa;
         cursor: pointer;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        color: #16483f;
+        color: #2c5282;
         padding: 0;
       }
 
       .eye-btn:hover {
-        background: #edf7f3;
+        background: var(--brand-primary-soft);
       }
 
       .eye-btn:focus {
-        outline: 2px solid #c4dacd;
+        outline: 2px solid #90cdf4;
       }
 
       .eye-btn svg {
@@ -1267,7 +1651,6 @@
       #admin-modal .modal,
       #language-modal .modal,
       #license-modal .modal,
-      #jivex-password-modal .modal,
       #assign-study-settings-modal .modal,
       #send-settings-modal .modal {
         width: 380px;
@@ -1364,22 +1747,22 @@
         justify-content: center;
         background: #fff;
         color: #1a2e2b;
-        border: 1px solid #c8d6d1;
+        border: 1px solid #dadce0;
       }
 
       .language-options .button:hover:not(.is-selected) {
-        background: #f0f5f3;
+        background: var(--brand-primary-soft);
       }
 
       .language-options .button.is-selected {
-        background: #005450;
+        background: #3182ce;
         color: #fff;
-        border-color: #005450;
+        border-color: #3182ce;
       }
 
       .language-options .button.is-selected:hover {
-        background: #003f3a;
-        border-color: #003f3a;
+        background: #2b6cb0;
+        border-color: #2b6cb0;
       }
 
       .settings-btn {
@@ -1390,7 +1773,7 @@
         width: 34px;
         height: 34px;
         padding: 0;
-        border: 1px solid #d0ddd8;
+        border: 1px solid #dadce0;
         background: #fff;
         color: #1a2e2b;
         border-radius: 10px;
@@ -1400,8 +1783,8 @@
       }
 
       .settings-btn:hover {
-        background: #edf7f3;
-        border-color: #b8cfc6;
+        background: var(--brand-primary-soft);
+        border-color: #63b3ed;
       }
 
       .settings-btn svg {
@@ -1430,9 +1813,9 @@
         gap: 12px;
         width: 100%;
         padding: 12px 14px;
-        border: 1px solid #e3ebe7;
+        border: 1px solid #e8eaed;
         border-radius: 12px;
-        background: #fbfdfc;
+        background: #f8f9fa;
         color: #1a2e2b;
         font-size: 14px;
         font-weight: 600;
@@ -1446,8 +1829,8 @@
       }
 
       .settings-menu-item:hover {
-        background: #edf7f3;
-        border-color: #c4dacd;
+        background: var(--brand-primary-soft);
+        border-color: #90cdf4;
       }
 
       .settings-menu-shortcut {
@@ -1459,7 +1842,7 @@
       .settings-license-footer {
         margin: 0 20px 16px;
         padding-top: 12px;
-        border-top: 1px solid #e3ebe7;
+        border-top: 1px solid #e8eaed;
         text-align: center;
         font-size: 12px;
         color: #5a6b66;
@@ -1475,8 +1858,8 @@
       }
 
       .settings-menu-toggle:hover {
-        background: #fbfdfc;
-        border-color: #e3ebe7;
+        background: #f8f9fa;
+        border-color: #e8eaed;
       }
 
       #settings-modal.modal-overlay {
@@ -1530,81 +1913,198 @@
           </button>
         </header>
 
-        <div class="menu-shell">
-          <section class="menu-step">
-            <h2 class="step-title" data-i18n="step1Title">Step 1: Scan or paste link</h2>
-            <div class="step-actions-row">
-              <button id="qr-scanner-btn" type="button" class="button" data-i18n="scanQr">
-                Scan QR code
-              </button>
-              <button id="paste-link-btn" type="button" class="button button-outline" data-i18n="pasteLink">
-                Paste link
-              </button>
+        <div class="wizard-layout">
+          <nav class="wizard-rail" aria-label="Workflow steps">
+            <div class="wizard-rail-step is-active" data-step="1">
+              <div class="wizard-rail-icon">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M10 13a5 5 0 0 1 0-7l1-1a5 5 0 0 1 7 7l-1 1M14 11a5 5 0 0 1 0 7l-1 1a5 5 0 0 1-7-7l1-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="wizard-rail-num">1</span>
             </div>
-            <div class="input-group portal-link-group">
-              <label for="url-input" data-i18n="portalLink">Portal link</label>
-              <input
-                type="url"
-                id="url-input"
-                data-i18n-placeholder="portalLinkPlaceholder"
-                placeholder="Paste or scan URL"
-                value=""
-              />
-              <button id="load-btn" type="button" class="button load-portal-btn">
-                Load
-              </button>
-              <p id="portal-link-scan-status" class="portal-link-scan-status" aria-live="polite"></p>
+            <div class="wizard-rail-line" aria-hidden="true"></div>
+            <div class="wizard-rail-step" data-step="2">
+              <div class="wizard-rail-icon">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/>
+                  <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="wizard-rail-num">2</span>
+            </div>
+            <div class="wizard-rail-line" aria-hidden="true"></div>
+            <div class="wizard-rail-step" data-step="3">
+              <div class="wizard-rail-icon">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M7 16a4 4 0 0 1 0-8h10a4 4 0 0 1 0 8H7z" stroke="currentColor" stroke-width="2"/>
+                  <path d="M12 12v9M9 18l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <span class="wizard-rail-num">3</span>
+            </div>
+          </nav>
+
+          <div class="wizard-main">
+            <div class="wizard-card">
+              <div class="menu-shell">
+          <section class="menu-step is-active" data-wizard-step="1">
+            <h2 class="step-title" data-i18n="step1Title">Step 1: Scan or paste link</h2>
+            <div class="step-body">
+              <div class="step-actions-row">
+                <button id="qr-scanner-btn" type="button" class="button" data-i18n="scanQr">
+                  Scan QR code
+                </button>
+                <button id="paste-link-btn" type="button" class="button button-outline" data-i18n="pasteLink">
+                  Paste link
+                </button>
+              </div>
+              <div class="input-group portal-link-group">
+                <label for="url-input" data-i18n="portalLink">Portal link</label>
+                <input
+                  type="url"
+                  id="url-input"
+                  data-i18n-placeholder="portalLinkPlaceholder"
+                  placeholder="Paste or scan URL"
+                  value=""
+                />
+                <p id="portal-link-scan-status" class="portal-link-scan-status" aria-live="polite"></p>
+                <div id="jivex-password-inline" class="jivex-password-inline" aria-live="polite">
+                  <div class="input-group">
+                    <label id="jivex-password-inline-label" for="jivex-portal-password" data-i18n="password">Password</label>
+                    <input
+                      type="text"
+                      id="jivex-portal-password"
+                      class="jivex-inline-password"
+                      data-i18n-placeholder="passwordPlaceholder"
+                      placeholder="Enter password"
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                    <p id="jivex-password-format-hint" class="jivex-password-format-hint"></p>
+                    <p id="jivex-password-inline-hint" class="jivex-password-inline-hint"></p>
+                  </div>
+                </div>
+              </div>
+              <div class="step-footer-actions">
+                <button id="load-btn" type="button" class="button load-portal-btn" data-i18n="load">
+                  Load
+                </button>
+              </div>
             </div>
           </section>
 
-          <section class="menu-step">
+          <section class="menu-step" data-wizard-step="2">
             <h2 class="step-title" data-i18n="step2Title">Step 2: Assign patient</h2>
-            <div class="patient-card" id="patient-card">
-              <div class="patient-card-row">
-                <div class="patient-field">
-                  <span class="patient-field-label" data-i18n="patientName">Patient Name</span>
-                  <span class="patient-field-value meta-missing" id="meta-patient-name">Not available</span>
+            <div class="step-body">
+              <div class="patient-card" id="patient-card">
+                <div class="patient-card-row">
+                  <div class="patient-field">
+                    <span class="patient-field-label" data-i18n="patientName">Patient Name</span>
+                    <span class="patient-field-value meta-missing" id="meta-patient-name">Not available</span>
+                  </div>
+                  <div class="patient-field">
+                    <span class="patient-field-label" data-i18n="patientId">Patient ID</span>
+                    <span class="patient-field-value meta-missing" id="meta-patient-id">Not available</span>
+                  </div>
+                </div>
+                <div class="patient-card-row">
+                  <div class="patient-field">
+                    <span class="patient-field-label" data-i18n="dateOfBirth">Date of Birth</span>
+                    <span class="patient-field-value meta-missing" id="meta-dob">Not available</span>
+                  </div>
+                  <div class="patient-field">
+                    <span class="patient-field-label" data-i18n="gender">Gender</span>
+                    <span class="patient-field-value meta-missing" id="meta-gender">Not available</span>
+                  </div>
                 </div>
                 <div class="patient-field">
-                  <span class="patient-field-label" data-i18n="patientId">Patient ID</span>
-                  <span class="patient-field-value meta-missing" id="meta-patient-id">Not available</span>
+                  <span class="patient-field-label" data-i18n="modality">Modality</span>
+                  <span class="patient-field-value meta-missing" id="meta-modality">Not available</span>
                 </div>
-              </div>
-              <div class="patient-card-row">
-                <div class="patient-field">
-                  <span class="patient-field-label" data-i18n="dateOfBirth">Date of Birth</span>
-                  <span class="patient-field-value meta-missing" id="meta-dob">Not available</span>
-                </div>
-                <div class="patient-field">
-                  <span class="patient-field-label" data-i18n="gender">Gender</span>
-                  <span class="patient-field-value meta-missing" id="meta-gender">Not available</span>
-                </div>
-              </div>
-              <div class="patient-field">
-                <span class="patient-field-label" data-i18n="modality">Modality</span>
-                <span class="patient-field-value meta-missing" id="meta-modality">Not available</span>
               </div>
             </div>
-            <button id="assign-study-btn" type="button" class="button assign-study-btn">
-              Assign study
-            </button>
+            <div class="step-footer-actions">
+              <button id="assign-study-btn" type="button" class="button assign-study-btn" data-i18n="assignStudy">
+                Assign study
+              </button>
+              <button id="skip-assign-btn" type="button" class="button button-skip-muted" data-i18n="skip">
+                Skip
+              </button>
+              <button
+                id="assign-step-back-btn"
+                type="button"
+                class="import-step-back-btn"
+                data-i18n="wizardBack"
+              >
+                Back
+              </button>
+            </div>
             <button id="eye-btn" type="button" class="button hidden-ui" tabindex="-1" aria-hidden="true">
               Open Selected Study
             </button>
           </section>
 
-          <section class="menu-step import-step">
+          <section class="menu-step import-step" data-wizard-step="3">
             <h2 class="step-title" id="import-step-title" data-i18n="step3Title">Step 3: Study import…</h2>
-            <div id="import-progress-wrap">
-              <div class="progress-track" aria-hidden="true">
-                <div class="progress-fill" id="import-progress-fill"></div>
+            <div class="import-step-body">
+              <div class="import-hero-icon-wrap" aria-hidden="true">
+                <svg id="import-icon-cloud" viewBox="0 0 24 24" fill="none">
+                  <path d="M7 16a4 4 0 0 1 0-8h10a4 4 0 0 1 0 8H7z" stroke="currentColor" stroke-width="1.75"/>
+                  <path d="M12 12v9M9 18l3 3 3-3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <svg id="import-icon-success" viewBox="0 0 24 24" fill="none" hidden>
+                  <path d="M7 13l3 3 7-7" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
               </div>
-              <p class="import-progress-text" id="import-progress-text">Ready to import</p>
+              <p class="import-status-heading" id="import-status-heading" data-i18n="readyToImport">Ready to import</p>
+              <p class="import-status-sub" id="import-status-sub" data-i18n="readyToImportDesc">The study is ready to be imported into your PACS.</p>
+              <div id="import-progress-wrap">
+                <div class="progress-track" aria-hidden="true">
+                  <div class="progress-fill" id="import-progress-fill"></div>
+                </div>
+                <p class="import-progress-text" id="import-progress-text"></p>
+                <div id="import-error-panel" class="import-error-panel" hidden>
+                  <p id="import-error-summary" class="import-error-summary"></p>
+                  <button
+                    id="import-error-logs-btn"
+                    type="button"
+                    class="button button-outline-brand import-error-logs-btn"
+                    data-i18n="seeLogs"
+                  >
+                    See logs
+                  </button>
+                </div>
+              </div>
             </div>
-            <div class="import-actions">
+            <div class="import-actions" id="import-ready-actions">
               <button id="add-to-pacs-btn" type="button" class="button" data-i18n="saveToPacs">Save to PACS</button>
+              <button
+                id="import-step-back-btn"
+                type="button"
+                class="import-step-back-btn"
+                data-i18n="wizardBack"
+              >
+                Back
+              </button>
+            </div>
+            <div class="import-success-actions" id="import-success-actions" hidden>
+              <button
+                id="import-another-btn"
+                type="button"
+                class="button"
+                data-i18n="importAnotherStudy"
+              >
+                Import another study
+              </button>
+              <button id="import-done-btn" type="button" class="button button-skip-muted" data-i18n="done">
+                Done
+              </button>
             </div>
           </section>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="status" id="status">
@@ -2045,18 +2545,19 @@
         <div class="modal-body">
           <div class="assign-mwl-filters">
             <div class="form-field">
-              <label for="assign-mwl-start">Start date</label>
+              <label for="assign-mwl-start" data-i18n="startDate">Start date</label>
               <input id="assign-mwl-start" type="date" />
             </div>
             <div class="form-field">
-              <label for="assign-mwl-end">End date</label>
+              <label for="assign-mwl-end" data-i18n="endDate">End date</label>
               <input id="assign-mwl-end" type="date" />
             </div>
             <div class="form-field form-field-full">
-              <label for="assign-mwl-search">Search (name, ID, or accession)</label>
+              <label for="assign-mwl-search" data-i18n="assignMwlSearchLabel">Search (name, ID, or accession)</label>
               <input
                 id="assign-mwl-search"
                 type="text"
+                data-i18n-placeholder="assignMwlSearchPlaceholder"
                 placeholder="Optional filter on results"
                 autocomplete="off"
               />
@@ -2065,20 +2566,20 @@
           <div class="assign-mwl-actions">
             <button id="assign-mwl-run" type="button" class="button" data-i18n="search">Search</button>
           </div>
-          <p class="assign-mwl-status" id="assign-mwl-status">Set dates and click Search.</p>
+          <p class="assign-mwl-status" id="assign-mwl-status" data-i18n="assignMwlSetDates">Set dates and click Search.</p>
           <div class="assign-mwl-table-wrap">
             <table class="assign-mwl-table" id="assign-mwl-table">
               <thead>
                 <tr>
-                  <th>Patient name</th>
-                  <th>Patient ID</th>
-                  <th>Accession</th>
-                  <th>Modality</th>
+                  <th data-i18n="tablePatientName">Patient name</th>
+                  <th data-i18n="patientId">Patient ID</th>
+                  <th data-i18n="tableAccession">Accession</th>
+                  <th data-i18n="modality">Modality</th>
                 </tr>
               </thead>
               <tbody id="assign-mwl-tbody"></tbody>
             </table>
-            <div class="assign-mwl-empty hidden-ui" id="assign-mwl-empty">No studies found for this range.</div>
+            <div class="assign-mwl-empty hidden-ui" id="assign-mwl-empty" data-i18n="assignMwlNoStudies">No studies found for this range.</div>
           </div>
         </div>
         <div class="modal-footer">
@@ -2112,7 +2613,8 @@
             <label class="hidden-ui" for="assign-mwl-tags-search">Search tags</label>
             <input
               id="assign-mwl-tags-search"
-              type="search"
+              type="text"
+              data-i18n-placeholder="assignMwlTagsSearchPlaceholder"
               placeholder="Search tag, name, or value…"
               autocomplete="off"
             />
@@ -2137,40 +2639,6 @@
       </div>
     </div>
 
-    <!-- Jivex portal password -->
-    <div class="modal-overlay" id="jivex-password-modal">
-      <div
-        class="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="jivex-password-title"
-      >
-        <div class="modal-header">
-          <div class="modal-title" id="jivex-password-title" data-i18n="password">Password</div>
-        </div>
-        <div class="auth-wrap">
-          <div class="auth-fields">
-            <div class="input-group">
-              <input
-                id="jivex-portal-password"
-                type="text"
-                data-i18n-placeholder="passwordPlaceholder"
-                placeholder="Enter password"
-                autocomplete="off"
-                spellcheck="false"
-                data-i18n-aria-label="password"
-                aria-label="Password"
-              />
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button id="jivex-password-cancel" type="button" class="button btn-cancel" data-i18n="cancel">Cancel</button>
-          <button id="jivex-password-continue" type="button" class="button" data-i18n="continue">Continue</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Operation complete (Load / Assign / Save to PACS) -->
     <div class="modal-overlay" id="operation-success-modal">
       <div
@@ -2187,6 +2655,22 @@
         <h3 class="success-modal-title" id="operation-success-title" data-i18n="success">Success</h3>
         <p class="success-modal-message" id="operation-success-message"></p>
         <button id="operation-success-ok" type="button" class="button" data-i18n="done">Done</button>
+      </div>
+    </div>
+
+    <!-- Import error logs (developers) -->
+    <div class="modal-overlay" id="import-logs-modal">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="import-logs-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="import-logs-title" data-i18n="errorLogsTitle">Error logs</div>
+          <button id="import-logs-close" type="button" class="btn-cancel button" data-i18n="close">Close</button>
+        </div>
+        <pre id="import-logs-content" class="import-logs-content"></pre>
       </div>
     </div>
 

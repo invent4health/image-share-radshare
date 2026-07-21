@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	hdscDownloadStudy: (portalUrl) => ipcRenderer.invoke('hdsc-download-study', portalUrl),
 	downloadPortalFallbackStudy: (portalUrl) => ipcRenderer.invoke('portal-fallback-download', portalUrl),
 	jivexDownloadStudy: (params) => ipcRenderer.invoke('jivex-download-study', params),
+	jivexDetectPasswordFormat: (portalUrl) => ipcRenderer.invoke('jivex-detect-password-format', portalUrl),
+	jivexReleasePreview: () => ipcRenderer.invoke('jivex-release-preview'),
 	getDownloadedStudy: (studyUid) => ipcRenderer.invoke('get-downloaded-study', studyUid),
 	onDownloadProgress: (handler) => {
 		if (typeof handler !== 'function') return () => {};
@@ -54,6 +56,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 		if (typeof handler !== 'function') return;
 		ipcRenderer.on('open-settings-modal', () => handler());
 	},
+	quitApp: () => ipcRenderer.invoke('app-quit'),
 	getAppLanguage: () => ipcRenderer.invoke('app-language-get'),
 	setAppLanguage: (lang) => ipcRenderer.invoke('app-language-set', lang),
 	licenseGetStatus: () => ipcRenderer.invoke('license-get-status'),
