@@ -282,7 +282,10 @@ async function handleSettingsUpdateClick() {
 
 		if (!check.updateAvailable) {
 			setSettingsUpdateStatus(
-				t('updateUpToDate', { version: check.remoteVersion || settingsAppVersionText }),
+				t('updateUpToDate', {
+					local: check.localVersion || settingsAppVersionText,
+					remote: check.remoteVersion || settingsAppVersionText,
+				}),
 			);
 			return;
 		}
@@ -321,7 +324,10 @@ async function handleSettingsUpdateClick() {
 		}
 
 		setSettingsUpdateStatus(
-			t('updateUpToDate', { version: result.remoteVersion || settingsAppVersionText }),
+			t('updateUpToDate', {
+				local: result.localVersion || settingsAppVersionText,
+				remote: result.remoteVersion || settingsAppVersionText,
+			}),
 		);
 	} catch (e) {
 		setSettingsUpdateStatus(e?.message || t('updateFailed'), true);
