@@ -284,6 +284,9 @@ async function handleSettingsUpdateClick() {
 
 		if (!check.updateAvailable) {
 			setSettingsUpdateStatus('');
+			window.alert(t('updateUpToDateAlert', {
+				version: check.remoteVersion || check.localVersion || settingsAppVersionText,
+			}));
 			return;
 		}
 
@@ -327,6 +330,9 @@ async function handleSettingsUpdateClick() {
 		}
 
 		setSettingsUpdateStatus('');
+		window.alert(t('updateUpToDateAlert', {
+			version: result.remoteVersion || result.localVersion || settingsAppVersionText,
+		}));
 	} catch (e) {
 		const msg = e?.message || t('updateFailed');
 		if (/spawn EINVAL|Object has been destroyed|reply was never sent|ERR_IPC/i.test(msg)) {
