@@ -912,7 +912,7 @@ ipcMain.handle('app-update-apply', async (event) => {
             }
             setTimeout(() => {
                 app.exit(0);
-            }, result.elevated ? 250 : 0);
+            }, result.elevated ? 1200 : 0);
         }
         return result;
     } catch (e) {

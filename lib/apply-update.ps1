@@ -125,6 +125,9 @@ try {
     Write-Log "Source: $sourceDir" $logFile
     Write-Log "Target: $appRoot" $logFile
 
+    Write-Log 'Waiting for app to finish update handoff...' $logFile
+    Start-Sleep -Seconds 4
+
     Stop-CognizanceApp -AppRoot $appRoot -RootPid $parentPid -LogFile $logFile
 
     if (-not (Test-Path -LiteralPath $sourceDir)) {

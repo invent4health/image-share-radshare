@@ -1,6 +1,6 @@
 {
   "name": "automation-toolv2",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Cognizance Health - Electron app to load studies and send DICOM images to PACS.",
   "main": "main.js",
   "scripts": {

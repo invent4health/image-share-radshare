@@ -281,12 +281,7 @@ async function handleSettingsUpdateClick() {
 		}
 
 		if (!check.updateAvailable) {
-			setSettingsUpdateStatus(
-				t('updateUpToDate', {
-					local: check.localVersion || settingsAppVersionText,
-					remote: check.remoteVersion || settingsAppVersionText,
-				}),
-			);
+			setSettingsUpdateStatus('');
 			return;
 		}
 
@@ -319,18 +314,24 @@ async function handleSettingsUpdateClick() {
 			return;
 		}
 		if (result.updated) {
-			setSettingsUpdateStatus(t('updateApplying'));
+			setSettingsUpdateStatus(result.elevated ? t('updateRestarting') : t('updateApplying'));
+			if (result.elevated && result.remoteVersion) {
+				settingsAppVersionText = result.remoteVersion;
+				if (settingsAppVersion) {
+					settingsAppVersion.textContent = t('appVersionLabel', { version: settingsAppVersionText });
+				}
+			}
 			return;
 		}
 
-		setSettingsUpdateStatus(
-			t('updateUpToDate', {
-				local: result.localVersion || settingsAppVersionText,
-				remote: result.remoteVersion || settingsAppVersionText,
-			}),
-		);
+		setSettingsUpdateStatus('');
 	} catch (e) {
-		setSettingsUpdateStatus(e?.message || t('updateFailed'), true);
+		const msg = e?.message || t('updateFailed');
+		if (/spawn EINVAL|Object has been destroyed|reply was never sent|ERR_IPC/i.test(msg)) {
+			setSettingsUpdateStatus(t('updateRestarting'));
+			return;
+		}
+		setSettingsUpdateStatus(msg, true);
 	} finally {
 		removeProgressListener?.();
 		appUpdateInProgress = false;
