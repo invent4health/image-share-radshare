@@ -102,6 +102,7 @@ const adminClose = document.getElementById('admin-close');
 const adminDone = document.getElementById('admin-done');
 const adminChangePasswordBtn = document.getElementById('admin-change-password');
 const adminPreviewToggle = document.getElementById('admin-preview-toggle');
+const adminPreviewRow = document.getElementById('admin-preview-row');
 
 // Auth modal (replaces prompt())
 const authModal = document.getElementById('auth-modal');
@@ -134,6 +135,10 @@ const settingsClose = document.getElementById('settings-close');
 const settingsAdminPanel = document.getElementById('settings-admin-panel');
 const settingsChangeLanguage = document.getElementById('settings-change-language');
 const settingsPreviewToggle = document.getElementById('settings-preview-toggle');
+const settingsPreviewRow = document.getElementById('settings-preview-row');
+const settingsAppVersion = document.getElementById('settings-app-version');
+const settingsUpdateBtn = document.getElementById('settings-update-btn');
+const settingsUpdateStatus = document.getElementById('settings-update-status');
 const licenseModal = document.getElementById('license-modal');
 const licenseKeyInput = document.getElementById('license-key-input');
 const licenseActivateBtn = document.getElementById('license-activate-btn');
@@ -156,6 +161,8 @@ let scanCompleteTimer = null;
 let wedgeScanActive = false;
 let wizardStep = 1;
 let importSuccessShown = false;
+let settingsAppVersionText = '1.0.0';
+let appUpdateInProgress = false;
 
 function refreshDynamicLabels() {
 	if (loadBtn && !loadInProgress) loadBtn.textContent = t('load');
@@ -180,6 +187,9 @@ function refreshDynamicLabels() {
 		jivexPortalPasswordInput.placeholder = jivexFormatInfo.format || DEFAULT_JIVEX_DATE_FORMAT;
 	}
 	updateJivexPasswordFormatHint();
+	if (settingsAppVersion) {
+		settingsAppVersion.textContent = t('appVersionLabel', { version: settingsAppVersionText });
+	}
 	for (const el of [metaPatientName, metaPatientId, metaDob, metaGender, metaModality]) {
 		if (el?.classList.contains('meta-missing')) el.textContent = t('notAvailable');
 	}
@@ -207,8 +217,126 @@ async function syncSettingsPreviewToggle() {
 	} catch { /* ignore */ }
 }
 
+function setWebPreviewControlsVisible(show) {
+	const visible = Boolean(show);
+	if (settingsPreviewRow) {
+		settingsPreviewRow.hidden = !visible;
+		settingsPreviewRow.classList.toggle('hidden-ui', !visible);
+	}
+	if (adminPreviewRow) {
+		adminPreviewRow.classList.toggle('hidden-ui', !visible);
+	}
+}
+
+async function syncWebPreviewControlVisibility() {
+	let show = false;
+	try {
+		if (window.electronAPI?.getAdminSettings) {
+			const res = await window.electronAPI.getAdminSettings();
+			if (res?.ok) show = Boolean(res.settings?.webPreviewButton);
+		}
+	} catch { /* ignore */ }
+	setWebPreviewControlsVisible(show);
+}
+
+function setSettingsUpdateStatus(text, isError = false) {
+	if (!settingsUpdateStatus) return;
+	settingsUpdateStatus.textContent = text || '';
+	settingsUpdateStatus.classList.toggle('is-error', Boolean(isError));
+}
+
+async function syncSettingsAppVersion() {
+	if (!settingsAppVersion || !window.electronAPI?.appUpdateGetVersion) return;
+	try {
+		const res = await window.electronAPI.appUpdateGetVersion();
+		if (res?.ok && res.version) {
+			settingsAppVersionText = res.version;
+			settingsAppVersion.textContent = t('appVersionLabel', { version: settingsAppVersionText });
+		}
+	} catch { /* ignore */ }
+}
+
+async function handleSettingsUpdateClick() {
+	if (appUpdateInProgress || !window.electronAPI?.appUpdateCheck) return;
+
+	appUpdateInProgress = true;
+	if (settingsUpdateBtn) settingsUpdateBtn.disabled = true;
+	setSettingsUpdateStatus(t('updateChecking'));
+
+	let removeProgressListener = null;
+	try {
+		const check = await window.electronAPI.appUpdateCheck();
+		if (handleLicenseApiError(check)) {
+			setSettingsUpdateStatus(t('updateFailed'), true);
+			return;
+		}
+		if (!check?.ok) {
+			setSettingsUpdateStatus(check?.reason || t('updateFailed'), true);
+			return;
+		}
+
+		settingsAppVersionText = check.localVersion || settingsAppVersionText;
+		if (settingsAppVersion) {
+			settingsAppVersion.textContent = t('appVersionLabel', { version: settingsAppVersionText });
+		}
+
+		if (!check.updateAvailable) {
+			setSettingsUpdateStatus(
+				t('updateUpToDate', { version: check.remoteVersion || settingsAppVersionText }),
+			);
+			return;
+		}
+
+		setSettingsUpdateStatus(
+			t('updateAvailable', {
+				local: check.localVersion,
+				remote: check.remoteVersion,
+			}),
+		);
+
+		const confirmed = window.confirm(
+			t('updateConfirm', { version: check.remoteVersion }),
+		);
+		if (!confirmed) return;
+
+		setSettingsUpdateStatus(t('updateApplying'));
+		if (window.electronAPI.onAppUpdateProgress) {
+			removeProgressListener = window.electronAPI.onAppUpdateProgress(({ message } = {}) => {
+				if (message) setSettingsUpdateStatus(message);
+			});
+		}
+
+		const result = await window.electronAPI.appUpdateApply();
+		if (handleLicenseApiError(result)) {
+			setSettingsUpdateStatus(t('updateFailed'), true);
+			return;
+		}
+		if (!result?.ok) {
+			setSettingsUpdateStatus(result?.reason || t('updateFailed'), true);
+			return;
+		}
+		if (result.updated) {
+			setSettingsUpdateStatus(t('updateApplying'));
+			return;
+		}
+
+		setSettingsUpdateStatus(
+			t('updateUpToDate', { version: result.remoteVersion || settingsAppVersionText }),
+		);
+	} catch (e) {
+		setSettingsUpdateStatus(e?.message || t('updateFailed'), true);
+	} finally {
+		removeProgressListener?.();
+		appUpdateInProgress = false;
+		if (settingsUpdateBtn) settingsUpdateBtn.disabled = false;
+	}
+}
+
 function openSettingsModal() {
+	syncWebPreviewControlVisibility();
 	syncSettingsPreviewToggle();
+	syncSettingsAppVersion();
+	setSettingsUpdateStatus('');
 	refreshSettingsLicenseStatus();
 	if (settingsModal) openModal(settingsModal);
 }
@@ -1508,6 +1636,7 @@ function applyWebPreviewEnabled(enabled) {
 // Initialize web preview state + keep in sync with main process menu toggle
 (async () => {
 	try {
+		await syncWebPreviewControlVisibility();
 		if (window.electronAPI && typeof window.electronAPI.webPreviewGetEnabled === 'function') {
 			const res = await window.electronAPI.webPreviewGetEnabled();
 			if (res && res.ok) applyWebPreviewEnabled(res.enabled);
@@ -1753,6 +1882,7 @@ async function handleAdminClick() {
 				return;
 			}
 			updateStatus('Admin password set');
+			await syncWebPreviewControlVisibility();
 			await syncAdminPreviewToggle();
 			openModal(adminModal);
 			return;
@@ -1766,6 +1896,7 @@ async function handleAdminClick() {
 			updateStatus('Wrong password', true);
 			return;
 		}
+		await syncWebPreviewControlVisibility();
 		await syncAdminPreviewToggle();
 		openModal(adminModal);
 	} catch (e) {
@@ -3115,6 +3246,11 @@ if (settingsPreviewToggle) {
 		}
 	});
 	settingsPreviewToggle.addEventListener('click', (e) => e.stopPropagation());
+}
+if (settingsUpdateBtn) {
+	settingsUpdateBtn.addEventListener('click', () => {
+		handleSettingsUpdateClick();
+	});
 }
 if (window.electronAPI?.onOpenSettingsModal) {
 	window.electronAPI.onOpenSettingsModal(() => openSettingsModal());

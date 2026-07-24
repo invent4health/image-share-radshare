@@ -1833,6 +1833,12 @@
         border-color: #90cdf4;
       }
 
+      .settings-menu-item[hidden],
+      #settings-preview-row.hidden-ui,
+      #admin-preview-row.hidden-ui {
+        display: none !important;
+      }
+
       .settings-menu-shortcut {
         font-size: 11px;
         font-weight: 500;
@@ -1860,6 +1866,35 @@
       .settings-menu-toggle:hover {
         background: #f8f9fa;
         border-color: #e8eaed;
+      }
+
+      .settings-update-block {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .settings-update-meta {
+        font-size: 12px;
+        color: #5a6b66;
+        line-height: 1.4;
+        text-align: left;
+      }
+
+      .settings-update-status {
+        font-size: 12px;
+        color: #5a6b66;
+        line-height: 1.4;
+        min-height: 1.4em;
+        margin: 0;
+      }
+
+      .settings-update-status.is-error {
+        color: #c62828;
+      }
+
+      .settings-update-btn {
+        width: 100%;
       }
 
       #settings-modal.modal-overlay {
@@ -2378,7 +2413,7 @@
           </button>
         </div>
         <div class="admin-actions">
-          <div class="admin-row">
+          <div id="admin-preview-row" class="admin-row hidden-ui">
             <div class="label">
               <div class="title" data-i18n="hideWebPreview">Hide Web Preview</div>
             </div>
@@ -2700,13 +2735,25 @@
           <button id="settings-change-language" type="button" class="settings-menu-item">
             <span data-i18n="changeLanguage">Change Language</span>
           </button>
-          <div class="settings-menu-item settings-menu-toggle admin-row">
+          <div id="settings-preview-row" class="settings-menu-item settings-menu-toggle admin-row hidden-ui" hidden>
             <div class="label">
               <div class="title" data-i18n="showWebPreview">Show Web Preview</div>
             </div>
             <label class="toggle" title="Show Web Preview">
               <input id="settings-preview-toggle" type="checkbox" />
             </label>
+          </div>
+          <div class="settings-update-block">
+            <button
+              id="settings-update-btn"
+              type="button"
+              class="button button-outline-brand settings-update-btn"
+              data-i18n="checkForUpdates"
+            >
+              Check for updates
+            </button>
+            <div class="settings-update-meta" id="settings-app-version">Version 1.0.0</div>
+            <p id="settings-update-status" class="settings-update-status" aria-live="polite"></p>
           </div>
         </div>
         <p id="settings-license-status" class="settings-license-footer" hidden></p>

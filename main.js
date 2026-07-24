@@ -18,6 +18,11 @@ import { downloadGoogleDriveToFile, resolveHdscFallbackDownload, resolvePortalFa
 import { downloadJivexStudyWithSeleniumInPreview } from './lib/jivex-selenium.js';
 import { detectJivexPasswordFormat, isJivexPortalUrl } from './lib/jivex-download.js';
 import {
+    applyAppUpdate,
+    checkForAppUpdate,
+    readLocalPackageVersion,
+} from './lib/app-update.js';
+import {
     daysSinceEpoch,
     normalizeLicenseKey,
     validateLicenseKey,
@@ -865,6 +870,46 @@ ipcMain.handle('load-website', async (event, url) => {
 ipcMain.handle('app-quit', async () => {
     app.quit();
     return { ok: true };
+});
+
+ipcMain.handle('app-update-get-version', async () => {
+    try {
+        const version = readLocalPackageVersion(__dirname);
+        return { ok: true, version };
+    } catch (e) {
+        return { ok: false, reason: e?.message || 'Failed to read version' };
+    }
+});
+
+ipcMain.handle('app-update-check', async () => {
+    const licenseBlocked = licenseGuardResponse();
+    if (licenseBlocked) return licenseBlocked;
+    try {
+        const result = await checkForAppUpdate(__dirname);
+        return result;
+    } catch (e) {
+        return { ok: false, reason: e?.message || 'Update check failed' };
+    }
+});
+
+ipcMain.handle('app-update-apply', async (event) => {
+    const licenseBlocked = licenseGuardResponse();
+    if (licenseBlocked) return licenseBlocked;
+    try {
+        const sender = event?.sender;
+        const result = await applyAppUpdate(__dirname, (message) => {
+            try {
+                sender?.send('app-update-progress', { message });
+            } catch { /* ignore */ }
+        });
+        if (result.ok && result.updated) {
+            app.relaunch();
+            app.quit();
+        }
+        return result;
+    } catch (e) {
+        return { ok: false, reason: e?.message || 'Update failed' };
+    }
 });
 
 ipcMain.handle('app-language-get', async () => {
@@ -1810,6 +1855,21 @@ ipcMain.handle('preview-resume', () => {
 const pacsFilePath = path.join(__dirname, 'pacs.json');
 const sendSettingsFilePath = path.join(__dirname, 'send-settings.json');
 const assignStudySettingsFilePath = path.join(__dirname, 'assign-study-settings.json');
+const adminSettingsFilePath = path.join(__dirname, 'admin-settings.json');
+
+function readAdminSettings() {
+    try {
+        if (!fs.existsSync(adminSettingsFilePath)) {
+            return { webPreviewButton: false };
+        }
+        const data = JSON.parse(fs.readFileSync(adminSettingsFilePath, 'utf8'));
+        return {
+            webPreviewButton: Boolean(data?.webPreviewButton),
+        };
+    } catch {
+        return { webPreviewButton: false };
+    }
+}
 function readPacsFile() {
     try {
         const data = fs.readFileSync(pacsFilePath, 'utf8');
@@ -1904,6 +1964,15 @@ ipcMain.handle('assign-study-settings-get', () => {
         return { ok: true, settings };
     } catch (e) {
         return { ok: false, reason: e?.message || 'Failed to load assign study settings' };
+    }
+});
+
+ipcMain.handle('admin-settings-get', () => {
+    try {
+        const settings = readAdminSettings();
+        return { ok: true, settings };
+    } catch (e) {
+        return { ok: false, reason: e?.message || 'Failed to load admin settings' };
     }
 });
 

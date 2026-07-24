@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	getSendSettings: () => ipcRenderer.invoke('send-settings-get'),
 	saveAssignStudySettings: (settings) => ipcRenderer.invoke('assign-study-settings-save', settings),
 	getAssignStudySettings: () => ipcRenderer.invoke('assign-study-settings-get'),
+	getAdminSettings: () => ipcRenderer.invoke('admin-settings-get'),
 	queryMwlWorklist: (params) => ipcRenderer.invoke('mwl-query', params),
 	getMwlStudyTags: (studyKey) => ipcRenderer.invoke('mwl-study-tags', studyKey),
 	sendDicomFiles: (params) => ipcRenderer.invoke('send-dicom-files', params),
@@ -61,6 +62,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	setAppLanguage: (lang) => ipcRenderer.invoke('app-language-set', lang),
 	licenseGetStatus: () => ipcRenderer.invoke('license-get-status'),
 	licenseActivate: (key) => ipcRenderer.invoke('license-activate', key),
+	appUpdateGetVersion: () => ipcRenderer.invoke('app-update-get-version'),
+	appUpdateCheck: () => ipcRenderer.invoke('app-update-check'),
+	appUpdateApply: () => ipcRenderer.invoke('app-update-apply'),
+	onAppUpdateProgress: (handler) => {
+		if (typeof handler !== 'function') return () => {};
+		const listener = (_event, payload) => handler(payload);
+		ipcRenderer.on('app-update-progress', listener);
+		return () => ipcRenderer.removeListener('app-update-progress', listener);
+	},
 	onWebPreviewEnabledChanged: (handler) => {
 		if (typeof handler !== 'function') return;
 		ipcRenderer.on('web-preview-enabled-changed', (_evt, payload) => handler(payload));
