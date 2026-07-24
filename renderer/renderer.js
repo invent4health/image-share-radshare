@@ -295,11 +295,11 @@ async function handleSettingsUpdateClick() {
 		);
 
 		const confirmed = window.confirm(
-			t('updateConfirm', { version: check.remoteVersion }),
+			t(check.requiresAdmin ? 'updateConfirmAdmin' : 'updateConfirm', { version: check.remoteVersion }),
 		);
 		if (!confirmed) return;
 
-		setSettingsUpdateStatus(t('updateApplying'));
+		setSettingsUpdateStatus(check.requiresAdmin ? t('updateAdminPending') : t('updateApplying'));
 		if (window.electronAPI.onAppUpdateProgress) {
 			removeProgressListener = window.electronAPI.onAppUpdateProgress(({ message } = {}) => {
 				if (message) setSettingsUpdateStatus(message);

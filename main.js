@@ -20,6 +20,7 @@ import { detectJivexPasswordFormat, isJivexPortalUrl } from './lib/jivex-downloa
 import {
     applyAppUpdate,
     checkForAppUpdate,
+    isAppRootWritable,
     readLocalPackageVersion,
 } from './lib/app-update.js';
 import {
@@ -886,7 +887,10 @@ ipcMain.handle('app-update-check', async () => {
     if (licenseBlocked) return licenseBlocked;
     try {
         const result = await checkForAppUpdate(__dirname);
-        return result;
+        return {
+            ...result,
+            requiresAdmin: process.platform === 'win32' && !isAppRootWritable(__dirname),
+        };
     } catch (e) {
         return { ok: false, reason: e?.message || 'Update check failed' };
     }
@@ -903,7 +907,9 @@ ipcMain.handle('app-update-apply', async (event) => {
             } catch { /* ignore */ }
         });
         if (result.ok && result.updated) {
-            app.relaunch();
+            if (!result.elevated) {
+                app.relaunch();
+            }
             app.quit();
         }
         return result;
