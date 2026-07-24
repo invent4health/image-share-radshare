@@ -1885,8 +1885,12 @@
         font-size: 12px;
         color: #5a6b66;
         line-height: 1.4;
-        min-height: 1.4em;
         margin: 0;
+      }
+
+      .settings-update-status[hidden],
+      .settings-update-status:empty {
+        display: none !important;
       }
 
       .settings-update-status.is-error {
@@ -2753,7 +2757,7 @@
               Check for updates
             </button>
             <div class="settings-update-meta" id="settings-app-version">Version 1.0.0</div>
-            <p id="settings-update-status" class="settings-update-status" aria-live="polite"></p>
+            <p id="settings-update-status" class="settings-update-status" aria-live="polite" hidden></p>
           </div>
         </div>
         <p id="settings-license-status" class="settings-license-footer" hidden></p>

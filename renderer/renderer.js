@@ -241,8 +241,10 @@ async function syncWebPreviewControlVisibility() {
 
 function setSettingsUpdateStatus(text, isError = false) {
 	if (!settingsUpdateStatus) return;
-	settingsUpdateStatus.textContent = text || '';
-	settingsUpdateStatus.classList.toggle('is-error', Boolean(isError));
+	const value = String(text || '').trim();
+	settingsUpdateStatus.textContent = value;
+	settingsUpdateStatus.hidden = !value;
+	settingsUpdateStatus.classList.toggle('is-error', Boolean(isError) && Boolean(value));
 }
 
 async function syncSettingsAppVersion() {

@@ -24,6 +24,6 @@ if errorlevel 1 (
 rem Run the app without opening a visible command window
 set "COGNIZANCE_REQUIRE_LICENSE=1"
 powershell -NoProfile -WindowStyle Hidden -Command ^
-  "$env:COGNIZANCE_REQUIRE_LICENSE='1'; $env:PATH='C:\Program Files\nodejs;C:\ProgramData\chocolatey\bin;' + $env:PATH; $p = New-Object System.Diagnostics.ProcessStartInfo; $p.FileName='cmd.exe'; $p.Arguments='/c npm run dev'; $p.WorkingDirectory='%APP_DIR%'; $p.UseShellExecute=$false; $p.CreateNoWindow=$true; $p.WindowStyle=[System.Diagnostics.ProcessWindowStyle]::Hidden; [void][System.Diagnostics.Process]::Start($p)"
+  "$env:COGNIZANCE_REQUIRE_LICENSE='1'; $env:PATH='C:\Program Files\nodejs;C:\ProgramData\chocolatey\bin;' + $env:PATH; $p = New-Object System.Diagnostics.ProcessStartInfo; $p.FileName='cmd.exe'; $p.Arguments='/c set COGNIZANCE_REQUIRE_LICENSE=1&& npm start'; $p.WorkingDirectory='%APP_DIR%'; $p.UseShellExecute=$false; $p.CreateNoWindow=$true; $p.WindowStyle=[System.Diagnostics.ProcessWindowStyle]::Hidden; [void][System.Diagnostics.Process]::Start($p)"
 
 endlocal

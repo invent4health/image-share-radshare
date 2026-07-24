@@ -25,11 +25,15 @@ import {
 } from './lib/app-update.js';
 import {
     daysSinceEpoch,
+    formatMac,
     normalizeLicenseKey,
     validateLicenseKey,
 } from './lib/license-crypto.js';
 
-// Keep hidden pages at full speed (match Chrome/Edge — no background throttling)
+const APP_DISPLAY_NAME = 'Cognizance Health';
+
+// Keep userData path stable across npm start / npm run dev / updates.
+try { app.setName(APP_DISPLAY_NAME); } catch { }
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
@@ -83,6 +87,36 @@ function saveAppLanguage(lang) {
 
 function getLicenseFilePath() {
     return path.join(app.getPath('userData'), 'license.json');
+}
+
+function getLegacyLicensePaths() {
+    const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    return [
+        path.join(appData, 'automation-toolv2', 'license.json'),
+        path.join(appData, APP_DISPLAY_NAME, 'license.json'),
+    ];
+}
+
+function migrateLicenseRecordIfNeeded() {
+    const target = getLicenseFilePath();
+    try {
+        if (fs.existsSync(target)) {
+            const current = JSON.parse(fs.readFileSync(target, 'utf8'));
+            if (current?.key) return;
+        }
+    } catch { /* fall through */ }
+
+    for (const legacyPath of getLegacyLicensePaths()) {
+        if (path.resolve(legacyPath) === path.resolve(target)) continue;
+        try {
+            if (!fs.existsSync(legacyPath)) continue;
+            const legacy = JSON.parse(fs.readFileSync(legacyPath, 'utf8'));
+            if (!legacy?.key) continue;
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.writeFileSync(target, JSON.stringify(legacy, null, 2), 'utf8');
+            return;
+        } catch { /* try next legacy path */ }
+    }
 }
 
 function isLicenseRequired() {
@@ -151,16 +185,30 @@ function getMachineMacAddress() {
     return getAllMachineMacAddresses()[0] || null;
 }
 
-function validateLicenseForMachine(rawKey) {
+function validateLicenseForMachine(rawKey, preferredMacHex) {
+    const tried = new Set();
+    const tryMac = (mac) => {
+        const normalized = String(mac || '').toUpperCase();
+        if (!normalized || tried.has(normalized)) return null;
+        tried.add(normalized);
+        const result = validateLicenseKey(rawKey, mac);
+        if (result.valid) return { ...result, macAddress: mac };
+        return null;
+    };
+
+    if (preferredMacHex) {
+        const preferredMac = formatMac(preferredMacHex);
+        const preferredHit = tryMac(preferredMac);
+        if (preferredHit) return preferredHit;
+    }
+
     const macs = getAllMachineMacAddresses();
     if (!macs.length) {
         return { ...validateLicenseKey(rawKey, ''), macAddress: null };
     }
     for (const mac of macs) {
-        const result = validateLicenseKey(rawKey, mac);
-        if (result.valid) {
-            return { ...result, macAddress: mac };
-        }
+        const hit = tryMac(mac);
+        if (hit) return hit;
     }
     return { valid: false, reason: 'invalid_key', macAddress: getMachineMacAddress() };
 }
@@ -287,11 +335,22 @@ function evaluateLicenseRecord(rec = readLicenseRecord()) {
 
     const mac = getMachineMacAddress();
     const today = daysSinceEpoch();
-    const result = validateLicenseForMachine(rec.key);
+    const result = validateLicenseForMachine(rec.key, rec.macHex);
     if (!result.valid) {
+        const expiresAtMs = rec?.expiresAt ? Date.parse(rec.expiresAt) : NaN;
+        if (rec?.key && Number.isFinite(expiresAtMs) && expiresAtMs > Date.now()) {
+            return buildActivatedLicenseState(rec, {
+                valid: true,
+                expired: false,
+                expiryDay: rec.expiryDay,
+                expiryDate: rec.expiryDate,
+                macHex: rec.macHex,
+                macAddress: rec.macHex ? formatMac(rec.macHex) : mac,
+            }, mac);
+        }
         return {
             activated: false,
-            expired: Boolean(rec.expiryDay),
+            expired: Number.isFinite(expiresAtMs) ? expiresAtMs <= Date.now() : Boolean(rec.expiryDay),
             daysRemaining: 0,
             expiryDate: rec.expiryDate || null,
             macAddress: result.macAddress || mac,
@@ -907,12 +966,9 @@ ipcMain.handle('app-update-apply', async (event) => {
             } catch { /* ignore */ }
         });
         if (result.ok && result.updated) {
-            if (!result.elevated) {
-                app.relaunch();
-            }
             setTimeout(() => {
                 app.exit(0);
-            }, result.elevated ? 1200 : 0);
+            }, 400);
         }
         return result;
     } catch (e) {
@@ -2109,8 +2165,8 @@ ipcMain.handle('trigger-eye', async () => {
 });
 
 app.whenReady().then(async () => {
+    migrateLicenseRecordIfNeeded();
     loadAppLanguage();
-    try { app.setName('Cognizance Health'); } catch { }
     // Helps Windows pick up the correct taskbar icon/app identity
     try { app.setAppUserModelId('com.web-previewer.app'); } catch { }
     registerAppShortcuts();

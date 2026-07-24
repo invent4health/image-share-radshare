@@ -29,7 +29,8 @@ function Get-RelativePath([string]$Base, [string]$Target) {
 }
 
 function Stop-CognizanceApp([string]$AppRoot, [int]$RootPid, [string]$LogFile) {
-    Write-Log "Stopping existing Cognizance Health processes..." $LogFile
+    Write-Log 'Stopping existing Cognizance Health processes...' $LogFile
+    $appRootNorm = [System.IO.Path]::GetFullPath($AppRoot)
 
     if ($RootPid -gt 0) {
         try {
@@ -39,36 +40,36 @@ function Stop-CognizanceApp([string]$AppRoot, [int]$RootPid, [string]$LogFile) {
         }
     }
 
-    Start-Sleep -Seconds 2
-
-    $appRootNorm = [System.IO.Path]::GetFullPath($AppRoot)
-    $processNames = @('electron.exe', 'node.exe', 'cmd.exe')
-    foreach ($name in $processNames) {
-        Get-CimInstance Win32_Process -Filter "Name = '$name'" -ErrorAction SilentlyContinue | ForEach-Object {
+    for ($pass = 1; $pass -le 4; $pass++) {
+        Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | ForEach-Object {
             $cmdLine = [string]$_.CommandLine
             if (-not $cmdLine) { return }
-            $matchesApp = $cmdLine -like "*$appRootNorm*"
-            $matchesLauncher = $cmdLine -like '*electronmon*' -or $cmdLine -like '*Cognizance Health*' -or $cmdLine -like '*npm run dev*'
-            if ($matchesApp -or ($name -ne 'cmd.exe' -and $matchesLauncher)) {
+
+            $inApp = $cmdLine -like "*$appRootNorm*"
+            $isMon = $cmdLine -like '*electronmon*'
+            $isNpm = $cmdLine -like '*npm run dev*' -or $cmdLine -like '*npm start*' -or $cmdLine -like '*npm.cmd*'
+            $shouldStop = $inApp -or $isMon -or ($isNpm -and $inApp)
+
+            if ($shouldStop) {
                 try {
                     Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
                 } catch { }
             }
         }
+        Start-Sleep -Seconds 1
     }
 
-    Start-Sleep -Seconds 2
     Write-Log 'Existing app processes stopped.' $LogFile
 }
 
 function Start-CognizanceAppHidden([string]$AppRoot, [string]$LogFile) {
-    Write-Log "Starting Cognizance Health (hidden)..." $LogFile
+    Write-Log 'Starting fresh Cognizance Health instance...' $LogFile
     $env:PATH = 'C:\Program Files\nodejs;C:\ProgramData\chocolatey\bin;' + $env:PATH
     $env:COGNIZANCE_REQUIRE_LICENSE = '1'
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = 'cmd.exe'
-    $psi.Arguments = '/c npm run dev'
+    $psi.Arguments = '/c set COGNIZANCE_REQUIRE_LICENSE=1&& npm start'
     $psi.WorkingDirectory = $AppRoot
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
@@ -125,8 +126,8 @@ try {
     Write-Log "Source: $sourceDir" $logFile
     Write-Log "Target: $appRoot" $logFile
 
-    Write-Log 'Waiting for app to finish update handoff...' $logFile
-    Start-Sleep -Seconds 4
+    Write-Log 'Waiting for app to hand off to updater...' $logFile
+    Start-Sleep -Seconds 2
 
     Stop-CognizanceApp -AppRoot $appRoot -RootPid $parentPid -LogFile $logFile
 
