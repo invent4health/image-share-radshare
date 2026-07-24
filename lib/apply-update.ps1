@@ -5,9 +5,16 @@ param(
 $ErrorActionPreference = 'Stop'
 
 function Write-Log([string]$Message, [string]$LogFile) {
+    if (-not $LogFile) { return }
     $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $Message"
-    if ($LogFile) {
-        Add-Content -Path $LogFile -Value $line -Encoding UTF8
+    try {
+        $logDir = Split-Path $LogFile -Parent
+        if ($logDir -and -not (Test-Path -LiteralPath $logDir)) {
+            New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+        }
+        Add-Content -LiteralPath $LogFile -Value $line -Encoding UTF8
+    } catch {
+        # Logging must never fail the update.
     }
 }
 
@@ -19,6 +26,54 @@ function Get-RelativePath([string]$Base, [string]$Target) {
         return $targetPath.Substring($basePath.Length)
     }
     return $targetPath
+}
+
+function Stop-CognizanceApp([string]$AppRoot, [int]$RootPid, [string]$LogFile) {
+    Write-Log "Stopping existing Cognizance Health processes..." $LogFile
+
+    if ($RootPid -gt 0) {
+        try {
+            cmd.exe /c "taskkill /T /F /PID $RootPid" 2>$null | Out-Null
+        } catch {
+            Write-Log "taskkill for root PID skipped: $($_.Exception.Message)" $LogFile
+        }
+    }
+
+    Start-Sleep -Seconds 2
+
+    $appRootNorm = [System.IO.Path]::GetFullPath($AppRoot)
+    $processNames = @('electron.exe', 'node.exe', 'cmd.exe')
+    foreach ($name in $processNames) {
+        Get-CimInstance Win32_Process -Filter "Name = '$name'" -ErrorAction SilentlyContinue | ForEach-Object {
+            $cmdLine = [string]$_.CommandLine
+            if (-not $cmdLine) { return }
+            $matchesApp = $cmdLine -like "*$appRootNorm*"
+            $matchesLauncher = $cmdLine -like '*electronmon*' -or $cmdLine -like '*Cognizance Health*' -or $cmdLine -like '*npm run dev*'
+            if ($matchesApp -or ($name -ne 'cmd.exe' -and $matchesLauncher)) {
+                try {
+                    Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+                } catch { }
+            }
+        }
+    }
+
+    Start-Sleep -Seconds 2
+    Write-Log 'Existing app processes stopped.' $LogFile
+}
+
+function Start-CognizanceAppHidden([string]$AppRoot, [string]$LogFile) {
+    Write-Log "Starting Cognizance Health (hidden)..." $LogFile
+    $env:PATH = 'C:\Program Files\nodejs;C:\ProgramData\chocolatey\bin;' + $env:PATH
+    $env:COGNIZANCE_REQUIRE_LICENSE = '1'
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = 'cmd.exe'
+    $psi.Arguments = '/c npm run dev'
+    $psi.WorkingDirectory = $AppRoot
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    [void][System.Diagnostics.Process]::Start($psi)
 }
 
 function Copy-Tree([string]$Src, [string]$Dest, [string]$AppRoot, [string[]]$PreserveNames, [string[]]$SkipDirs, [string]$PreserveDir) {
@@ -46,6 +101,10 @@ function Copy-Tree([string]$Src, [string]$Dest, [string]$AppRoot, [string[]]$Pre
     Copy-Item -LiteralPath $Src -Destination $Dest -Force
 }
 
+$logFile = $null
+$updateFailed = $false
+$failureMessage = ''
+
 try {
     if (-not (Test-Path -LiteralPath $ParamsFile)) {
         throw "Update params file not found: $ParamsFile"
@@ -56,29 +115,17 @@ try {
     $appRoot = [string]$params.appRoot
     $preserveDir = [string]$params.preserveDir
     $parentPid = [int]$params.parentPid
-    $launchCmd = [string]$params.launchCmd
     $tempRoot = [string]$params.tempRoot
     $logFile = [string]$params.logFile
 
     $preserveNames = @('send-settings.json', 'assign-study-settings.json', 'admin-settings.json', 'pacs.json')
     $skipDirs = @('node_modules', '.git', 'received-dicom')
 
-    Write-Log "Updater started." $logFile
+    Write-Log 'Updater started.' $logFile
     Write-Log "Source: $sourceDir" $logFile
     Write-Log "Target: $appRoot" $logFile
 
-    if ($parentPid -gt 0) {
-        Write-Log "Waiting for app process $parentPid to exit..." $logFile
-        try {
-            $proc = Get-Process -Id $parentPid -ErrorAction SilentlyContinue
-            if ($proc) {
-                $proc.WaitForExit(120000)
-            }
-        } catch {
-            Write-Log "Process wait skipped: $($_.Exception.Message)" $logFile
-        }
-        Start-Sleep -Seconds 2
-    }
+    Stop-CognizanceApp -AppRoot $appRoot -RootPid $parentPid -LogFile $logFile
 
     if (-not (Test-Path -LiteralPath $sourceDir)) {
         throw "Extracted update folder not found: $sourceDir"
@@ -128,13 +175,8 @@ try {
         Pop-Location
     }
 
-    Write-Log 'Update complete. Relaunching app...' $logFile
-    if ($launchCmd -and (Test-Path -LiteralPath $launchCmd)) {
-        $launchRoot = Split-Path -Parent $launchCmd
-        Start-Process -FilePath $launchCmd -WorkingDirectory $launchRoot
-    } else {
-        Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npm run dev' -WorkingDirectory $appRoot
-    }
+    Start-CognizanceAppHidden -AppRoot $appRoot -LogFile $logFile
+    Write-Log 'Updater finished successfully.' $logFile
 
     if ($tempRoot -and (Test-Path -LiteralPath $tempRoot)) {
         Start-Sleep -Seconds 2
@@ -145,23 +187,22 @@ try {
         }
     }
 
-    Write-Log 'Updater finished successfully.' $logFile
     exit 0
 } catch {
-    $message = $_.Exception.Message
-    try {
-        if ($logFile) {
-            Write-Log "Update failed: $message" $logFile
-        }
-    } catch { }
-    try {
-        Add-Type -AssemblyName PresentationFramework
-        [System.Windows.MessageBox]::Show(
-            "Cognizance Health could not finish the update:`n`n$message`n`nTry running the app as administrator or reinstall from the latest installer.",
-            'Update failed',
-            'OK',
-            'Error'
-        ) | Out-Null
-    } catch { }
+    $updateFailed = $true
+    $failureMessage = $_.Exception.Message
+    Write-Log "Update failed: $failureMessage" $logFile
     exit 1
+} finally {
+    if ($updateFailed) {
+        try {
+            Add-Type -AssemblyName PresentationFramework
+            [System.Windows.MessageBox]::Show(
+                "Cognizance Health could not finish the update:`n`n$failureMessage`n`nTry running the app as administrator or reinstall from the latest installer.",
+                'Update failed',
+                'OK',
+                'Error'
+            ) | Out-Null
+        } catch { }
+    }
 }

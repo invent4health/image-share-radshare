@@ -910,7 +910,9 @@ ipcMain.handle('app-update-apply', async (event) => {
             if (!result.elevated) {
                 app.relaunch();
             }
-            app.quit();
+            setTimeout(() => {
+                app.exit(0);
+            }, result.elevated ? 250 : 0);
         }
         return result;
     } catch (e) {
